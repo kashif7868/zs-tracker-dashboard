@@ -84,6 +84,21 @@ const EMPTY_PROGRESS: ProjectProgress = {
   actionPlan: 0,
 };
 
+const CLIENT_TRACKER_BASE_URL = (
+  import.meta.env.VITE_CLIENT_TRACKER_URL?.trim() ||
+  "http://localhost:5173"
+).replace(/\/+$/, "");
+
+const buildClientProjectUrl = (
+  token: string
+): string => {
+  if (!token) {
+    return "";
+  }
+
+  return `${CLIENT_TRACKER_BASE_URL}/project/${encodeURIComponent(token)}`;
+};
+
 /* =========================================================
    FORMAT HELPERS
    ========================================================= */
@@ -833,8 +848,8 @@ export default function ProjectDetailsPage() {
     useState("");
 
   const [
-    copiedToken,
-    setCopiedToken,
+    copiedLink,
+    setCopiedLink,
   ] =
     useState(false);
 
@@ -925,14 +940,14 @@ export default function ProjectDetailsPage() {
   }, [successMessage]);
 
   useEffect(() => {
-    if (!copiedToken) {
+    if (!copiedLink) {
       return;
     }
 
     const timeoutId =
       window.setTimeout(
         () => {
-          setCopiedToken(false);
+          setCopiedLink(false);
         },
         2500
       );
@@ -942,7 +957,7 @@ export default function ProjectDetailsPage() {
         timeoutId
       );
     };
-  }, [copiedToken]);
+  }, [copiedLink]);
 
   /* =======================================================
      COMPUTED DATA
@@ -978,6 +993,15 @@ export default function ProjectDetailsPage() {
         project
           ?.clientAccess
           ?.isEnabled
+    );
+
+  const clientProjectUrl =
+    useMemo(
+      () =>
+        buildClientProjectUrl(
+          clientAccessToken
+        ),
+      [clientAccessToken]
     );
 
   /* =======================================================
@@ -1117,8 +1141,8 @@ export default function ProjectDetailsPage() {
 
         setSuccessMessage(
           isClientAccessEnabled
-            ? "New client access token generate ho gaya."
-            : "Client access successfully enable ho gaya."
+            ? "New client project link generate ho gaya."
+            : "Client project link successfully enable ho gaya."
         );
       } catch (error) {
         console.error(
@@ -1226,21 +1250,21 @@ export default function ProjectDetailsPage() {
     };
 
   /* =======================================================
-     COPY TOKEN
+     COPY / OPEN CLIENT PROJECT LINK
      ======================================================= */
 
-  const handleCopyToken =
+  const handleCopyClientLink =
     async () => {
-      if (!clientAccessToken) {
+      if (!clientProjectUrl) {
         return;
       }
 
       try {
         await copyText(
-          clientAccessToken
+          clientProjectUrl
         );
 
-        setCopiedToken(
+        setCopiedLink(
           true
         );
       } catch (error) {
@@ -1250,9 +1274,22 @@ export default function ProjectDetailsPage() {
         );
 
         setErrorMessage(
-          "Access token copy nahi ho saka."
+          "Client project link copy nahi ho saka."
         );
       }
+    };
+
+  const handleOpenClientView =
+    () => {
+      if (!clientProjectUrl) {
+        return;
+      }
+
+      window.open(
+        clientProjectUrl,
+        "_blank",
+        "noopener,noreferrer"
+      );
     };
 
   /* =======================================================
@@ -2014,7 +2051,7 @@ export default function ProjectDetailsPage() {
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
             <CardHeader
               title="Client Access"
-              description="Secure project access token manage karein."
+              description="Read-only client project link manage karein. Client ko login ki zarurat nahi."
             />
 
             <div className="p-5">
@@ -2034,51 +2071,65 @@ export default function ProjectDetailsPage() {
                 {isClientAccessEnabled &&
                 !clientAccessToken ? (
                   <span className="text-xs text-gray-400">
-                    Token hidden
+                    Existing token hidden
                   </span>
                 ) : null}
               </div>
 
-              {clientAccessToken ? (
+              {clientProjectUrl ? (
                 <div className="mt-5">
                   <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    Access Token
+                    Client Project Link
                   </label>
 
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      readOnly
-                      value={
-                        clientAccessToken
-                      }
-                      className="h-10 min-w-0 flex-1 rounded-xl border border-gray-200 bg-gray-50 px-3 text-xs text-gray-700 outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
-                    />
+                  <input
+                    type="text"
+                    readOnly
+                    value={clientProjectUrl}
+                    className="h-10 w-full min-w-0 rounded-xl border border-gray-200 bg-gray-50 px-3 text-xs text-gray-700 outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                  />
 
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
                     <button
                       type="button"
                       onClick={() => {
-                        void handleCopyToken();
+                        void handleCopyClientLink();
                       }}
                       className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-gray-200 px-3 text-xs font-semibold text-gray-600 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5"
                     >
                       <CopyIcon />
 
-                      {copiedToken
-                        ? "Copied"
-                        : "Copy"}
+                      {copiedLink
+                        ? "Link Copied"
+                        : "Copy Client Link"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleOpenClientView}
+                      className="inline-flex h-10 items-center justify-center rounded-xl bg-emerald-600 px-3 text-xs font-semibold text-white transition hover:bg-emerald-700"
+                    >
+                      Open Client View
                     </button>
                   </div>
 
                   <p className="mt-2 text-xs leading-5 text-gray-400">
-                    Is token ko secure
-                    location mein save
-                    karein. Database mein
-                    sirf hashed token save
-                    hota hai.
+                    Yehi complete link client ko WhatsApp ya email par share karein. Client link open karke project ko read-only mode mein dekhega.
                   </p>
                 </div>
-              ) : null}
+              ) : isClientAccessEnabled ? (
+                <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-500/20 dark:bg-amber-500/10">
+                  <p className="text-xs leading-5 text-amber-700 dark:text-amber-400">
+                    Client access enabled hai lekin raw token security ki wajah se dobara load nahi hota. Agar purana link save nahi hai to “Regenerate Client Link” press karein aur naya link copy karein.
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-5 rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800">
+                  <p className="text-xs leading-5 text-gray-500 dark:text-gray-400">
+                    Client link abhi disabled hai. “Generate Client Link” press karne ke baad shareable read-only project URL yahan show hoga.
+                  </p>
+                </div>
+              )}
 
               <div className="mt-5 space-y-2">
                 <button
@@ -2097,8 +2148,8 @@ export default function ProjectDetailsPage() {
                   "generate-access"
                     ? "Generating..."
                     : isClientAccessEnabled
-                      ? "Regenerate Access Token"
-                      : "Enable Client Access"}
+                      ? "Regenerate Client Link"
+                      : "Generate Client Link"}
                 </button>
 
                 {isClientAccessEnabled ? (
