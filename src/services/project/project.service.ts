@@ -132,6 +132,81 @@ export type ClientAccessResponse = {
 };
 
 /* =========================================================
+   PUBLIC CLIENT TRACKER TYPES
+
+   Public project link se yeh read-only data backend se aata
+   hai. Client ko login/JWT ki zarurat nahi hoti.
+   ========================================================= */
+
+export type ProjectRiskStatus =
+  | "in_progress"
+  | "complete";
+
+export type ProjectEvidenceType =
+  | "before"
+  | "after";
+
+export type ProjectEvidence = {
+  _id: string;
+  id?: string;
+
+  projectId?: string;
+  projectCode?: string;
+
+  riskId?: string;
+  riskRegisterId?: string;
+
+  evidenceType: ProjectEvidenceType;
+
+  imagePath: string;
+
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type ProjectRiskEvidence = {
+  before: ProjectEvidence[];
+  after: ProjectEvidence[];
+
+  beforeCount: number;
+  afterCount: number;
+  totalCount: number;
+
+  canMarkComplete: boolean;
+};
+
+export type ProjectRisk = {
+  _id: string;
+  id?: string;
+
+  projectId?: string;
+  projectCode?: string;
+
+  serialNo?: number;
+  riskRegisterId?: string;
+
+  description: string;
+  remarksEffect?: string;
+
+  status: ProjectRiskStatus;
+
+  evidence: ProjectRiskEvidence;
+
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type ProjectTrackerSummary = {
+  totalRisks: number;
+  complete: number;
+  inProgress: number;
+  totalEvidence: number;
+
+  overallProgress: number;
+  evidenceProgress: number;
+};
+
+/* =========================================================
    DEFAULT VALUES
    ========================================================= */
 
@@ -166,26 +241,15 @@ export const EMPTY_RISK_SUMMARY: ProjectRiskSummary =
   };
 
 /*
-  Existing imported tracker compatibility constants.
+  Backward compatibility exports.
 
-  Future mein actual values backend database se calculate
-  hongi.
+  Fake / Excel baseline values intentionally remove kar diye
+  gaye hain. Client tracker sirf live backend data use karega.
 */
 
 export const EXCEL_BASELINE_RISK_SUMMARY: ProjectRiskSummary =
   {
-    totalRiskGroups: 17,
-    totalEvidence: 203,
-
-    extreme: 6,
-    high: 5,
-    medium: 4,
-    low: 2,
-
-    open: 17,
-    inProgress: 0,
-    awaitingVerification: 0,
-    closed: 0,
+    ...EMPTY_RISK_SUMMARY,
   };
 
 export const EXCEL_BASELINE_PROJECT_PROGRESS: ProjectProgress =
@@ -243,6 +307,18 @@ export type Project = {
   progressBreakdown: ProjectProgress;
 
   riskSummary: ProjectRiskSummary;
+
+  /*
+    Public client tracker data.
+
+    Protected admin project responses mein arrays empty ho
+    sakti hain. Public token response mein actual risks aur
+    Before / After evidence yahan normalize honge.
+  */
+
+  risks: ProjectRisk[];
+
+  trackerSummary: ProjectTrackerSummary;
 
   projectLead?:
     | string
@@ -895,6 +971,539 @@ const normalizeTeamMembers = (
     );
 };
 
+
+const normalizeProjectRiskStatus = (
+  value: unknown
+): ProjectRiskStatus => {
+  switch (value) {
+    case "complete":
+    case "completed":
+    case "closed":
+      return "complete";
+
+    case "in_progress":
+    case "open":
+    default:
+      return "in_progress";
+  }
+};
+
+const normalizeProjectEvidenceType = (
+  value: unknown
+): ProjectEvidenceType => {
+  return value === "after"
+    ? "after"
+    : "before";
+};
+
+const normalizeProjectEvidence = (
+  value: unknown,
+  fallbackType: ProjectEvidenceType
+): ProjectEvidence | null => {
+  if (!isObject(value)) {
+    return null;
+  }
+
+  const id =
+    (
+      isString(value._id) &&
+      value._id
+    ) ||
+    (
+      isString(value.id) &&
+      value.id
+    ) ||
+    "";
+
+  const imagePath =
+    isString(value.imagePath)
+      ? value.imagePath.trim()
+      : "";
+
+  if (!imagePath) {
+    return null;
+  }
+
+  return {
+    _id: id || imagePath,
+
+    ...(isString(value.id)
+      ? {
+          id: value.id,
+        }
+      : {}),
+
+    ...(isString(value.projectId)
+      ? {
+          projectId:
+            value.projectId,
+        }
+      : {}),
+
+    ...(isString(value.projectCode)
+      ? {
+          projectCode:
+            value.projectCode,
+        }
+      : {}),
+
+    ...(isString(value.riskId)
+      ? {
+          riskId:
+            value.riskId,
+        }
+      : {}),
+
+    ...(isString(value.riskRegisterId)
+      ? {
+          riskRegisterId:
+            value.riskRegisterId,
+        }
+      : {}),
+
+    evidenceType:
+      value.evidenceType !==
+      undefined
+        ? normalizeProjectEvidenceType(
+            value.evidenceType
+          )
+        : fallbackType,
+
+    imagePath,
+
+    ...(isString(value.createdAt)
+      ? {
+          createdAt:
+            value.createdAt,
+        }
+      : {}),
+
+    ...(isString(value.updatedAt)
+      ? {
+          updatedAt:
+            value.updatedAt,
+        }
+      : {}),
+  };
+};
+
+const normalizeProjectEvidenceList = (
+  value: unknown,
+  evidenceType: ProjectEvidenceType
+): ProjectEvidence[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) =>
+      normalizeProjectEvidence(
+        item,
+        evidenceType
+      )
+    )
+    .filter(
+      (
+        item
+      ): item is ProjectEvidence =>
+        item !== null
+    );
+};
+
+const normalizeProjectRiskEvidence = (
+  value: unknown
+): ProjectRiskEvidence => {
+  if (!isObject(value)) {
+    return {
+      before: [],
+      after: [],
+      beforeCount: 0,
+      afterCount: 0,
+      totalCount: 0,
+      canMarkComplete: false,
+    };
+  }
+
+  const before =
+    normalizeProjectEvidenceList(
+      value.before,
+      "before"
+    );
+
+  const after =
+    normalizeProjectEvidenceList(
+      value.after,
+      "after"
+    );
+
+  const beforeCount =
+    Math.max(
+      before.length,
+      getNumber(
+        value.beforeCount
+      )
+    );
+
+  const afterCount =
+    Math.max(
+      after.length,
+      getNumber(
+        value.afterCount
+      )
+    );
+
+  const totalCount =
+    Math.max(
+      beforeCount +
+        afterCount,
+      getNumber(
+        value.totalCount
+      )
+    );
+
+  return {
+    before,
+    after,
+
+    beforeCount,
+    afterCount,
+    totalCount,
+
+    canMarkComplete:
+      typeof value
+        .canMarkComplete ===
+      "boolean"
+        ? value
+            .canMarkComplete
+        : beforeCount > 0 &&
+          afterCount > 0,
+  };
+};
+
+const normalizeProjectRisk = (
+  value: unknown
+): ProjectRisk | null => {
+  if (!isObject(value)) {
+    return null;
+  }
+
+  const id =
+    (
+      isString(value._id) &&
+      value._id
+    ) ||
+    (
+      isString(value.id) &&
+      value.id
+    ) ||
+    "";
+
+  if (!id) {
+    return null;
+  }
+
+  const evidence =
+    normalizeProjectRiskEvidence(
+      value.evidence
+    );
+
+  return {
+    _id: id,
+
+    ...(isString(value.id)
+      ? {
+          id: value.id,
+        }
+      : {}),
+
+    ...(isString(value.projectId)
+      ? {
+          projectId:
+            value.projectId,
+        }
+      : {}),
+
+    ...(isString(value.projectCode)
+      ? {
+          projectCode:
+            value.projectCode,
+        }
+      : {}),
+
+    ...(value.serialNo !==
+    undefined
+      ? {
+          serialNo:
+            getNumber(
+              value.serialNo
+            ),
+        }
+      : {}),
+
+    ...(isString(value.riskRegisterId)
+      ? {
+          riskRegisterId:
+            value.riskRegisterId,
+        }
+      : {}),
+
+    description:
+      isString(value.description)
+        ? value.description
+        : "Risk record",
+
+    ...(isString(value.remarksEffect)
+      ? {
+          remarksEffect:
+            value.remarksEffect,
+        }
+      : {}),
+
+    status:
+      normalizeProjectRiskStatus(
+        value.status
+      ),
+
+    evidence,
+
+    ...(isString(value.createdAt)
+      ? {
+          createdAt:
+            value.createdAt,
+        }
+      : {}),
+
+    ...(isString(value.updatedAt)
+      ? {
+          updatedAt:
+            value.updatedAt,
+        }
+      : {}),
+  };
+};
+
+const normalizeProjectRisks = (
+  value: unknown
+): ProjectRisk[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map(
+      normalizeProjectRisk
+    )
+    .filter(
+      (
+        risk
+      ): risk is ProjectRisk =>
+        risk !== null
+    );
+};
+
+const buildTrackerSummaryFromRisks = (
+  risks: ProjectRisk[]
+): ProjectTrackerSummary => {
+  const totalRisks =
+    risks.length;
+
+  const complete =
+    risks.filter(
+      (risk) =>
+        risk.status ===
+        "complete"
+    ).length;
+
+  const inProgress =
+    risks.filter(
+      (risk) =>
+        risk.status ===
+        "in_progress"
+    ).length;
+
+  const totalEvidence =
+    risks.reduce(
+      (
+        total,
+        risk
+      ) =>
+        total +
+        risk.evidence
+          .totalCount,
+      0
+    );
+
+  const evidenceComplete =
+    risks.filter(
+      (risk) =>
+        risk.evidence
+          .beforeCount > 0 &&
+        risk.evidence
+          .afterCount > 0
+    ).length;
+
+  const overallProgress =
+    totalRisks > 0
+      ? Math.round(
+          (
+            complete /
+            totalRisks
+          ) * 100
+        )
+      : 0;
+
+  const evidenceProgress =
+    totalRisks > 0
+      ? Math.round(
+          (
+            evidenceComplete /
+            totalRisks
+          ) * 100
+        )
+      : 0;
+
+  return {
+    totalRisks,
+    complete,
+    inProgress,
+    totalEvidence,
+    overallProgress,
+    evidenceProgress,
+  };
+};
+
+const normalizeTrackerSummary = (
+  value: unknown,
+  risks: ProjectRisk[]
+): ProjectTrackerSummary => {
+  const derived =
+    buildTrackerSummaryFromRisks(
+      risks
+    );
+
+  if (!isObject(value)) {
+    return derived;
+  }
+
+  return {
+    totalRisks:
+      risks.length > 0
+        ? derived.totalRisks
+        : getNumber(
+            value.totalRisks,
+            derived.totalRisks
+          ),
+
+    complete:
+      risks.length > 0
+        ? derived.complete
+        : getNumber(
+            value.complete,
+            derived.complete
+          ),
+
+    inProgress:
+      risks.length > 0
+        ? derived.inProgress
+        : getNumber(
+            value.inProgress,
+            derived.inProgress
+          ),
+
+    totalEvidence:
+      risks.length > 0
+        ? derived.totalEvidence
+        : getNumber(
+            value.totalEvidence,
+            derived.totalEvidence
+          ),
+
+    overallProgress:
+      risks.length > 0
+        ? derived.overallProgress
+        : clampPercentage(
+            value.overallProgress
+          ),
+
+    evidenceProgress:
+      risks.length > 0
+        ? derived.evidenceProgress
+        : clampPercentage(
+            value.evidenceProgress
+          ),
+  };
+};
+
+const mergeLiveRiskSummary = (
+  storedSummary: ProjectRiskSummary,
+  trackerSummary: ProjectTrackerSummary,
+  risks: ProjectRisk[]
+): ProjectRiskSummary => {
+  const hasLiveTrackerData =
+    risks.length > 0 ||
+    trackerSummary.totalRisks > 0;
+
+  if (!hasLiveTrackerData) {
+    return storedSummary;
+  }
+
+  return {
+    ...storedSummary,
+
+    totalRiskGroups:
+      trackerSummary.totalRisks,
+
+    totalEvidence:
+      trackerSummary.totalEvidence,
+
+    open: 0,
+
+    inProgress:
+      trackerSummary.inProgress,
+
+    awaitingVerification:
+      0,
+
+    closed:
+      trackerSummary.complete,
+  };
+};
+
+const mergeLiveProgress = (
+  storedProgress: ProjectProgress,
+  trackerSummary: ProjectTrackerSummary,
+  risks: ProjectRisk[]
+): ProjectProgress => {
+  const hasLiveTrackerData =
+    risks.length > 0 ||
+    trackerSummary.totalRisks > 0;
+
+  if (!hasLiveTrackerData) {
+    return storedProgress;
+  }
+
+  return {
+    overall:
+      trackerSummary
+        .overallProgress,
+
+    rectification:
+      trackerSummary
+        .overallProgress,
+
+    evidence:
+      trackerSummary
+        .evidenceProgress,
+
+    testing:
+      storedProgress.testing,
+
+    actionPlan:
+      storedProgress
+        .actionPlan,
+  };
+};
+
 /* =========================================================
    COMPATIBILITY MAPPERS
    ========================================================= */
@@ -1079,14 +1688,40 @@ const normalizeProject = (
       value.settings
     );
 
-  const progressBreakdown =
+  const risks =
+    normalizeProjectRisks(
+      value.risks
+    );
+
+  const trackerSummary =
+    normalizeTrackerSummary(
+      value.trackerSummary,
+      risks
+    );
+
+  const storedProgress =
     normalizeProgress(
+      value.progressBreakdown ??
       value.progress
     );
 
-  const riskSummary =
+  const progressBreakdown =
+    mergeLiveProgress(
+      storedProgress,
+      trackerSummary,
+      risks
+    );
+
+  const storedRiskSummary =
     normalizeRiskSummary(
       value.riskSummary
+    );
+
+  const riskSummary =
+    mergeLiveRiskSummary(
+      storedRiskSummary,
+      trackerSummary,
+      risks
     );
 
   const systemCapacityKW =
@@ -1250,6 +1885,10 @@ const normalizeProject = (
     progressBreakdown,
 
     riskSummary,
+
+    risks,
+
+    trackerSummary,
 
     projectLead,
 
@@ -1439,8 +2078,58 @@ const extractProjectResponse = (
         responseData.project
       )
     ) {
-      rawProject =
-        responseData.project;
+      rawProject = {
+        ...responseData.project,
+
+        ...(
+          Array.isArray(
+            responseData.risks
+          )
+            ? {
+                risks:
+                  responseData.risks,
+              }
+            : {}
+        ),
+
+        ...(
+          isObject(
+            responseData
+              .trackerSummary
+          )
+            ? {
+                trackerSummary:
+                  responseData
+                    .trackerSummary,
+              }
+            : {}
+        ),
+
+        ...(
+          isObject(
+            responseData
+              .riskSummary
+          )
+            ? {
+                riskSummary:
+                  responseData
+                    .riskSummary,
+              }
+            : {}
+        ),
+
+        ...(
+          responseData
+            .progress !==
+          undefined
+            ? {
+                progress:
+                  responseData
+                    .progress,
+              }
+            : {}
+        ),
+      };
     }
 
     if (
@@ -2389,10 +3078,19 @@ export const getPublicProjectByToken =
   async (
     accessToken: string
   ): Promise<Project> => {
+    const normalizedToken =
+      accessToken.trim();
+
+    if (!normalizedToken) {
+      throw new Error(
+        "Project access token is required."
+      );
+    }
+
     const response =
       await api.get(
         `/projects/public/access/${encodeURIComponent(
-          accessToken.trim()
+          normalizedToken
         )}`
       );
 
@@ -2437,18 +3135,80 @@ export const getProjectSiteLabel = (
 ): string => {
   const values = [
     project.site?.name,
+    project.site?.location,
     project.site?.city,
     project.site?.province,
-  ].filter(
-    (
-      value
-    ): value is string =>
-      Boolean(
-        value?.trim()
-      )
-  );
+  ]
+    .filter(
+      (
+        value
+      ): value is string =>
+        Boolean(
+          value?.trim()
+        )
+    )
+    .map(
+      (value) =>
+        value.trim()
+    );
 
-  return values.join(", ");
+  return Array.from(
+    new Set(values)
+  ).join(", ");
+};
+
+/* =========================================================
+   PUBLIC EVIDENCE IMAGE URL
+   ========================================================= */
+
+export const getPublicEvidenceImageUrl = (
+  imagePath: string
+): string => {
+  const normalizedPath =
+    imagePath.trim();
+
+  if (!normalizedPath) {
+    return "";
+  }
+
+  if (
+    normalizedPath.startsWith(
+      "http://"
+    ) ||
+    normalizedPath.startsWith(
+      "https://"
+    )
+  ) {
+    return normalizedPath;
+  }
+
+  const publicPath =
+    normalizedPath.startsWith(
+      "/"
+    )
+      ? normalizedPath
+      : `/${normalizedPath}`;
+
+  const apiBaseUrl =
+    String(
+      api.defaults.baseURL ??
+      ""
+    )
+      .trim()
+      .replace(
+        /\/+$/,
+        ""
+      );
+
+  const serverBaseUrl =
+    apiBaseUrl.replace(
+      /\/api\/v1$/i,
+      ""
+    );
+
+  return serverBaseUrl
+    ? `${serverBaseUrl}${publicPath}`
+    : publicPath;
 };
 
 /* =========================================================
@@ -2474,6 +3234,7 @@ const projectService = {
   getProjectReferenceNumber,
   getProjectDisplayName,
   getProjectSiteLabel,
+  getPublicEvidenceImageUrl,
 };
 
 export default projectService;

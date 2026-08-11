@@ -86,7 +86,7 @@ const EMPTY_PROGRESS: ProjectProgress = {
 
 const CLIENT_TRACKER_BASE_URL = (
   import.meta.env.VITE_CLIENT_TRACKER_URL?.trim() ||
-  "http://localhost:5173"
+  "https://zorays-solar-risk-tracker-g8ef-cyan.vercel.app"
 ).replace(/\/+$/, "");
 
 const buildClientProjectUrl = (
