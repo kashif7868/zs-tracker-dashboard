@@ -11,9 +11,10 @@ import PageMeta from "../../components/common/PageMeta";
 
 import ProjectCompletionCard from "../../components/Tracker/ProjectCompletionCard";
 import ProjectTrackerMetrics from "../../components/Tracker/ProjectTrackerMetrics";
-import RecentRisks from "../../components/Tracker/RecentRisks";
-import RiskCategoryCard from "../../components/Tracker/RiskCategoryCard";
-import RiskWorkActivityChart from "../../components/Tracker/RiskWorkActivityChart";
+import TaskCategoryCard from "../../components/Tracker/TaskCategoryCard";
+import RecentTasks from "../../components/Tracker/RecentTasks";
+import TaskWorkActivityChart from "../../components/Tracker/TaskWorkActivityChart";
+import TaskResolutionChart from "../../components/Tracker/TaskResolutionChart";
 
 import {
   getDocuments,
@@ -163,7 +164,7 @@ export default function Home() {
     <>
       <PageMeta
         title="Dashboard | Project Tracker"
-        description="Project Tracker dashboard for electrical safety risks, evidence, rectification progress and generated reports."
+        description="Project Tracker dashboard for project tasks, Before/After Evidence, completion progress and generated reports."
       />
 
       <div className="w-full min-w-0 max-w-full overflow-x-hidden">
@@ -197,7 +198,7 @@ export default function Home() {
                   </h1>
 
                   <p className="mt-1.5 max-w-2xl text-sm leading-6 text-gray-500 dark:text-gray-400">
-                    Electrical safety risks, evidence, rectification progress
+                    Project tasks, Before/After Evidence, completion progress
                     and project reporting in one live workspace.
                   </p>
                 </div>
@@ -211,7 +212,7 @@ export default function Home() {
                     </p>
 
                     <p className="mt-0.5 truncate text-xs font-bold text-gray-800 dark:text-white">
-                      Risk Register
+                      Task Register
                     </p>
                   </div>
 
@@ -246,13 +247,12 @@ export default function Home() {
               <ProjectCompletionCard />
             </div>
           </section>
-
           {/* =================================================
-              WORK PROGRESS ACTIVITY
+              TASK RESOLUTION STATISTICS
               ================================================= */}
 
           <section className="w-full min-w-0 max-w-full overflow-hidden">
-            <RiskWorkActivityChart />
+            <TaskResolutionChart />
           </section>
 
           {/* =================================================
@@ -268,16 +268,16 @@ export default function Home() {
               ================================================= */}
 
           <section className="grid w-full min-w-0 max-w-full grid-cols-1 items-stretch gap-4 sm:gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.3fr)] xl:gap-6">
-            {/* RISK WORKFLOW */}
+            {/* TASK WORKFLOW */}
 
             <div className="w-full min-w-0 max-w-full overflow-hidden">
-              <RiskCategoryCard />
+              <TaskCategoryCard />
             </div>
 
-            {/* RECENT RISKS */}
+            {/* RECENT TASKS */}
 
             <div className="w-full min-w-0 max-w-full overflow-hidden">
-              <RecentRisks />
+              <RecentTasks />
             </div>
           </section>
         </div>
@@ -703,7 +703,7 @@ function RecentDocumentCard({
             document.summary
               .totalRisks
           }{" "}
-          Risks
+          Tasks
         </span>
 
         <span>

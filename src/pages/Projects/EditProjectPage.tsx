@@ -22,7 +22,6 @@ import {
   getProjectReferenceNumber,
   updateProject,
   type OverallRiskLevel,
-  type ProjectStatus,
   type ProjectType,
   type UpdateProjectPayload,
 } from "../../services/project/project.service";
@@ -52,9 +51,7 @@ type ProjectFormData = {
   auditDate: string;
   startDate: string;
   expectedCompletionDate: string;
-  actualCompletionDate: string;
 
-  status: ProjectStatus;
   overallRiskLevel: OverallRiskLevel;
 
   riskRegisterIdEnabled: boolean;
@@ -94,9 +91,7 @@ const initialFormData: ProjectFormData = {
   auditDate: "",
   startDate: "",
   expectedCompletionDate: "",
-  actualCompletionDate: "",
 
-  status: "draft",
   overallRiskLevel: "high_to_critical",
 
   riskRegisterIdEnabled: false,
@@ -114,7 +109,7 @@ const projectTypeOptions: Array<{
 }> = [
   {
     value: "risk_rectification",
-    label: "Risk Rectification",
+    label: "Task / Rectification Project",
   },
   {
     value: "electrical_audit",
@@ -135,38 +130,6 @@ const projectTypeOptions: Array<{
   {
     value: "other",
     label: "Other",
-  },
-];
-
-const statusOptions: Array<{
-  value: ProjectStatus;
-  label: string;
-  disabled?: boolean;
-}> = [
-  {
-    value: "draft",
-    label: "Draft",
-  },
-  {
-    value: "active",
-    label: "Active",
-  },
-  {
-    value: "on_hold",
-    label: "On Hold",
-  },
-  {
-    value: "awaiting_verification",
-    label: "Awaiting Verification",
-  },
-  {
-    value: "completed",
-    label: "Completed",
-  },
-  {
-    value: "archived",
-    label: "Archived",
-    disabled: true,
   },
 ];
 
@@ -481,6 +444,11 @@ export default function EditProjectPage() {
   ] = useState("");
 
   const [
+    currentStatus,
+    setCurrentStatus,
+  ] = useState("");
+
+  const [
     errors,
     setErrors,
   ] =
@@ -531,6 +499,11 @@ export default function EditProjectPage() {
             getProjectReferenceNumber(
               project
             )
+          );
+
+          setCurrentStatus(
+            project.status ||
+            "draft"
           );
 
           setFormData({
@@ -613,16 +586,6 @@ export default function EditProjectPage() {
                 project
                   .expectedCompletionDate
               ),
-
-            actualCompletionDate:
-              formatDateForInput(
-                project
-                  .actualCompletionDate
-              ),
-
-            status:
-              project.status ||
-              "draft",
 
             overallRiskLevel:
               project
@@ -825,22 +788,6 @@ export default function EditProjectPage() {
       }
 
       if (
-        formData.startDate &&
-        formData
-          .actualCompletionDate &&
-        new Date(
-          formData
-            .actualCompletionDate
-        ) <
-          new Date(
-            formData.startDate
-          )
-      ) {
-        nextErrors.actualCompletionDate =
-          "Actual completion date start date se pehle nahi ho sakti.";
-      }
-
-      if (
         formData
           .systemCapacityKW
           .trim()
@@ -916,9 +863,6 @@ export default function EditProjectPage() {
           projectType:
             formData
               .projectType,
-
-          status:
-            formData.status,
 
           overallRiskLevel:
             formData
@@ -1000,11 +944,6 @@ export default function EditProjectPage() {
           expectedCompletionDate:
             formData
               .expectedCompletionDate,
-
-          actualCompletionDate:
-            formData
-              .actualCompletionDate ||
-            null,
 
           notes:
             formData.notes
@@ -1201,6 +1140,16 @@ export default function EditProjectPage() {
         </section>
       ) : null}
 
+      <section className="rounded-2xl border border-violet-200 bg-violet-50 p-4 dark:border-violet-500/20 dark:bg-violet-500/10">
+        <p className="text-sm font-semibold text-violet-800 dark:text-violet-300">
+          Project lifecycle is controlled separately.
+        </p>
+
+        <p className="mt-1 text-xs leading-5 text-violet-700 dark:text-violet-400">
+          Edit Project sirf project ki information aur planned schedule update karta hai. Project status aur actual completion ko manually edit karne ke bajaye Project Details page ke lifecycle actions use karein.
+        </p>
+      </section>
+
       {/* ===================================================
           PROJECT INFORMATION
           =================================================== */}
@@ -1208,7 +1157,7 @@ export default function EditProjectPage() {
       <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
         <SectionHeader
           title="Project Information"
-          description="Project title, reference, type, status aur scope update karein."
+          description="Project title, reference, type aur scope update karein. Lifecycle status Project Details page se manage hoga."
         />
 
         <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-2">
@@ -1300,54 +1249,21 @@ export default function EditProjectPage() {
           </div>
 
           <div>
-            <label
-              htmlFor="status"
-              className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
-            >
-              Project Status
+            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Current Project Status
             </label>
 
-            <select
-              id="status"
-              name="status"
-              value={
-                formData.status
-              }
-              onChange={
-                handleInputChange
-              }
-              disabled={
-                formData.status ===
-                "archived"
-              }
-              className="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none transition focus:border-emerald-400 focus:ring-3 focus:ring-emerald-500/10 disabled:cursor-not-allowed disabled:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:disabled:bg-gray-800"
-            >
-              {statusOptions.map(
-                (option) => (
-                  <option
-                    key={
-                      option.value
-                    }
-                    value={
-                      option.value
-                    }
-                    disabled={
-                      option.disabled
-                    }
-                  >
-                    {option.label}
-                  </option>
-                )
-              )}
-            </select>
+            <div className="flex min-h-11 items-center rounded-xl border border-violet-200 bg-violet-50 px-4 text-sm font-semibold capitalize text-violet-700 dark:border-violet-500/20 dark:bg-violet-500/10 dark:text-violet-300">
+              {currentStatus
+                ? currentStatus
+                    .split("_")
+                    .join(" ")
+                : "Draft"}
+            </div>
 
-            {formData.status ===
-            "archived" ? (
-              <p className="mt-1.5 text-xs text-gray-400">
-                Archived project ka
-                status edit nahi ho sakta.
-              </p>
-            ) : null}
+            <p className="mt-1.5 text-xs leading-5 text-gray-400">
+              Status yahan editable nahi hai. Start, Hold, Resume, Complete aur Archive actions Project Details page se perform hongi.
+            </p>
           </div>
 
           <div>
@@ -1743,10 +1659,10 @@ export default function EditProjectPage() {
       <section className="overflow-visible rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
         <SectionHeader
           title="Audit & Project Schedule"
-          description="Audit, start, expected completion aur actual completion dates update karein."
+          description="Audit, planned start aur expected completion dates update karein. Actual completion date project complete karte waqt automatically record hogi."
         />
 
-        <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-3">
           <CalendarDatePicker
             id="auditDate"
             name="auditDate"
@@ -1800,26 +1716,7 @@ export default function EditProjectPage() {
             }
           />
 
-          <CalendarDatePicker
-            id="actualCompletionDate"
-            name="actualCompletionDate"
-            label="Actual Completion"
-            value={
-              formData
-                .actualCompletionDate
-            }
-            min={
-              formData.startDate ||
-              undefined
-            }
-            error={
-              errors
-                .actualCompletionDate
-            }
-            onChange={
-              handleInputChange
-            }
-          />
+
         </div>
       </section>
 
@@ -1830,20 +1727,20 @@ export default function EditProjectPage() {
       <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
         <SectionHeader
           title="Project Settings"
-          description="Risk Register ID field ki project-level visibility manage karein."
+          description="Task Register ID field ki project-level visibility manage karein."
         />
 
         <div className="p-5 sm:p-6">
           <label className="flex cursor-pointer items-start justify-between gap-5 rounded-xl border border-gray-200 p-4 dark:border-gray-800">
             <div className="min-w-0">
               <span className="block text-sm font-semibold text-gray-900 dark:text-white">
-                Enable Risk Register ID
+                Enable Task Register ID
               </span>
 
               <span className="mt-1 block text-xs leading-5 text-gray-500 dark:text-gray-400">
-                Enable hone par Risk
+                Enable hone par Task
                 create aur edit forms mein
-                optional Risk Register ID
+                optional Task Register ID
                 field show hogi. Sr. No.
                 phir bhi automatically
                 generate hoga.
@@ -1918,8 +1815,8 @@ export default function EditProjectPage() {
         </p>
 
         <p className="mt-1 text-xs leading-5 text-emerald-700 dark:text-emerald-400">
-          Risk count, evidence count,
-          completed findings, action-plan
+          Task count, evidence count,
+          completed work, action-plan
           progress aur testing progress
           manually edit nahi ki ja sakti.
         </p>
@@ -1942,7 +1839,7 @@ export default function EditProjectPage() {
             type="submit"
             disabled={
               isSubmitting ||
-              formData.status ===
+              currentStatus ===
                 "archived"
             }
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"

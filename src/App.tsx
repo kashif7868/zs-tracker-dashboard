@@ -16,9 +16,9 @@ import CreateProjectPage from "./pages/Projects/CreateProjectPage";
 import ProjectDetailsPage from "./pages/Projects/ProjectDetailsPage";
 import EditProjectPage from "./pages/Projects/EditProjectPage";
 
-import RiskRegisterPage from "./pages/RiskRegister/RiskRegisterPage";
-import CreateRiskPage from "./pages/RiskRegister/CreateRiskPage";
-import RiskDetailsPage from "./pages/RiskRegister/RiskDetailsPage";
+import TaskRegisterPage from "./pages/TaskRegister/TaskRegisterPage";
+import CreateTaskPage from "./pages/TaskRegister/CreateTaskPage";
+import TaskDetailsPage from "./pages/TaskRegister/TaskDetailsPage";
 
 import EvidencePage from "./pages/Evidence/EvidencePage";
 
@@ -34,9 +34,7 @@ import ProtectedRoute from "./components/auth/ProtectedRoute";
 
 import AppLayout from "./layout/AppLayout";
 
-import {
-  AuthProvider,
-} from "./context/AuthContext";
+import { AuthProvider } from "./context/AuthContext";
 
 /* =========================================================
    PLACEHOLDER PAGE
@@ -101,16 +99,8 @@ export default function App() {
               PROTECTED ROUTES
               ================================================= */}
 
-          <Route
-            element={
-              <ProtectedRoute />
-            }
-          >
-            <Route
-              element={
-                <AppLayout />
-              }
-            >
+          <Route element={<ProtectedRoute />}>
+            <Route element={<AppLayout />}>
               {/* =================================================
                   DASHBOARD
                   ================================================= */}
@@ -136,55 +126,41 @@ export default function App() {
 
               <Route
                 path="/projects"
-                element={
-                  <ProjectsPage />
-                }
+                element={<ProjectsPage />}
               />
 
               <Route
                 path="/projects/create"
-                element={
-                  <CreateProjectPage />
-                }
+                element={<CreateProjectPage />}
               />
 
               <Route
                 path="/projects/:projectId"
-                element={
-                  <ProjectDetailsPage />
-                }
+                element={<ProjectDetailsPage />}
               />
 
               <Route
                 path="/projects/:projectId/edit"
-                element={
-                  <EditProjectPage />
-                }
+                element={<EditProjectPage />}
               />
 
               {/* =================================================
-                  RISK REGISTER
+                  TASK REGISTER
                   ================================================= */}
 
               <Route
-                path="/risks"
-                element={
-                  <RiskRegisterPage />
-                }
+                path="/tasks"
+                element={<TaskRegisterPage />}
               />
 
               <Route
-                path="/risks/create"
-                element={
-                  <CreateRiskPage />
-                }
+                path="/tasks/create"
+                element={<CreateTaskPage />}
               />
 
               <Route
-                path="/risks/:riskId"
-                element={
-                  <RiskDetailsPage />
-                }
+                path="/tasks/:taskId"
+                element={<TaskDetailsPage />}
               />
 
               {/* =================================================
@@ -193,9 +169,7 @@ export default function App() {
 
               <Route
                 path="/evidence"
-                element={
-                  <EvidencePage />
-                }
+                element={<EvidencePage />}
               />
 
               {/* =================================================
@@ -232,9 +206,7 @@ export default function App() {
 
               <Route
                 path="/documents"
-                element={
-                  <DocumentsPage />
-                }
+                element={<DocumentsPage />}
               />
 
               {/* =================================================
@@ -246,7 +218,7 @@ export default function App() {
                 element={
                   <PlaceholderPage
                     title="Notifications"
-                    description="Project and Risk notifications will be connected in a later module."
+                    description="Project and Task notifications will be connected in a later module."
                   />
                 }
               />
@@ -257,9 +229,7 @@ export default function App() {
 
               <Route
                 path="/users"
-                element={
-                  <UsersPage />
-                }
+                element={<UsersPage />}
               />
 
               {/* =================================================
@@ -268,9 +238,7 @@ export default function App() {
 
               <Route
                 path="/profile"
-                element={
-                  <UserProfiles />
-                }
+                element={<UserProfiles />}
               />
 
               {/* =================================================
@@ -279,23 +247,18 @@ export default function App() {
 
               <Route
                 path="/support"
-                element={
-                  <SupportPage />
-                }
+                element={<SupportPage />}
               />
 
               {/* =================================================
                   SETTINGS
 
-                  Roles and Permissions yahin manage hongi.
-                  Separate Roles route nahi hai.
+                  Roles and Permissions are managed here.
                   ================================================= */}
 
               <Route
                 path="/settings"
-                element={
-                  <SettingsPage />
-                }
+                element={<SettingsPage />}
               />
             </Route>
           </Route>
@@ -306,9 +269,7 @@ export default function App() {
 
           <Route
             path="*"
-            element={
-              <NotFound />
-            }
+            element={<NotFound />}
           />
         </Routes>
       </AuthProvider>

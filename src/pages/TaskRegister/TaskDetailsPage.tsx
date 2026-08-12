@@ -23,14 +23,14 @@ import {
 } from "../../services/project/project.service";
 
 import {
-  getRiskById,
-  markRiskComplete,
-  markRiskInProgress,
-  updateRisk,
-  type RiskDetailsResult,
-  type RiskStatus,
-  type UpdateRiskPayload,
-} from "../../services/risk/risk.service";
+  getTaskById,
+  markTaskComplete,
+  markTaskInProgress,
+  updateTask,
+  type TaskDetailsResult,
+  type TaskStatus,
+  type UpdateTaskPayload,
+} from "../../services/task_register/task.service";
 
 import {
   deleteEvidence,
@@ -45,13 +45,16 @@ import {
    TYPES
    ========================================================= */
 
-type RiskUpdateForm = {
-  riskRegisterId: string;
+type TaskUpdateForm = {
+  taskRegisterId: string;
   description: string;
 };
 
 type FormErrors = Partial<
-  Record<keyof RiskUpdateForm, string>
+  Record<
+    keyof TaskUpdateForm,
+    string
+  >
 >;
 
 type BusyAction =
@@ -63,11 +66,6 @@ type BusyAction =
   | "complete"
   | "in_progress"
   | `delete_${string}`;
-
-type InformationItemProps = {
-  label: string;
-  value?: string | number | null;
-};
 
 type EvidenceGalleryProps = {
   title: string;
@@ -96,8 +94,8 @@ type EvidenceGalleryProps = {
    CONSTANTS
    ========================================================= */
 
-const INITIAL_FORM: RiskUpdateForm = {
-  riskRegisterId: "",
+const INITIAL_FORM: TaskUpdateForm = {
+  taskRegisterId: "",
   description: "",
 };
 
@@ -105,7 +103,7 @@ const INPUT_CLASSES =
   "h-12 w-full rounded-xl border border-gray-300 bg-white px-4 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500 dark:border-gray-700 dark:bg-gray-950 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/10 dark:disabled:bg-gray-900";
 
 const TEXTAREA_CLASSES =
-  "min-h-40 w-full resize-y rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm leading-6 text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:bg-gray-100 dark:border-gray-700 dark:bg-gray-950 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/10 dark:disabled:bg-gray-900";
+  "min-h-44 w-full resize-y rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm leading-6 text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:bg-gray-100 dark:border-gray-700 dark:bg-gray-950 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/10 dark:disabled:bg-gray-900";
 
 const EVIDENCE_ACCEPT =
   ".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp";
@@ -265,13 +263,11 @@ const ImageIcon = () => (
       height="16"
       rx="2"
     />
-
     <circle
       cx="8.5"
       cy="9"
       r="1.5"
     />
-
     <path d="M21 15L16 10L6 20" />
   </svg>
 );
@@ -288,19 +284,19 @@ const getErrorMessage = (
     error !== null &&
     "response" in error
   ) {
-    const requestError = error as {
-      response?: {
-        data?: {
-          message?: string;
-          error?: string;
-
-          errors?: Array<{
+    const requestError =
+      error as {
+        response?: {
+          data?: {
             message?: string;
-            msg?: string;
-          }>;
+            error?: string;
+            errors?: Array<{
+              message?: string;
+              msg?: string;
+            }>;
+          };
         };
       };
-    };
 
     return (
       requestError.response?.data
@@ -360,8 +356,8 @@ const normalizeUppercaseValue = (
 };
 
 const validateForm = (
-  form: RiskUpdateForm,
-  riskRegisterIdEnabled: boolean
+  form: TaskUpdateForm,
+  taskRegisterIdEnabled: boolean
 ): FormErrors => {
   const errors: FormErrors = {};
 
@@ -370,26 +366,26 @@ const validateForm = (
 
   if (!description) {
     errors.description =
-      "Description is required.";
+      "Task description is required.";
   } else if (
     description.length < 3
   ) {
     errors.description =
-      "Description must contain at least 3 characters.";
+      "Task description must contain at least 3 characters.";
   } else if (
     description.length > 3000
   ) {
     errors.description =
-      "Description cannot exceed 3000 characters.";
+      "Task description cannot exceed 3000 characters.";
   }
 
   if (
-    riskRegisterIdEnabled &&
-    form.riskRegisterId.trim().length >
+    taskRegisterIdEnabled &&
+    form.taskRegisterId.trim().length >
       100
   ) {
-    errors.riskRegisterId =
-      "Risk Register ID cannot exceed 100 characters.";
+    errors.taskRegisterId =
+      "Task Register ID cannot exceed 100 characters.";
   }
 
   return errors;
@@ -453,6 +449,29 @@ const getEvidenceFileError = (
   return "";
 };
 
+const isTaskRegisterIdEnabled = (
+  project?: Project | null
+): boolean => {
+  if (!project) {
+    return false;
+  }
+
+  const settings =
+    project.settings as
+      | {
+          taskRegisterIdEnabled?: boolean;
+          riskRegisterIdEnabled?: boolean;
+        }
+      | undefined;
+
+  return (
+    settings?.taskRegisterIdEnabled ===
+      true ||
+    settings?.riskRegisterIdEnabled ===
+      true
+  );
+};
+
 /* =========================================================
    STATUS BADGE
    ========================================================= */
@@ -460,17 +479,14 @@ const getEvidenceFileError = (
 function StatusBadge({
   status,
 }: {
-  status: RiskStatus;
+  status: TaskStatus;
 }) {
   if (
     status === "complete"
   ) {
     return (
       <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-400">
-        <span className="flex size-5 items-center justify-center rounded-full bg-emerald-600 text-white">
-          <CheckIcon />
-        </span>
-
+        <CheckIcon />
         Complete
       </span>
     );
@@ -480,40 +496,11 @@ function StatusBadge({
     <span className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-400">
       <span className="relative flex size-3">
         <span className="absolute inline-flex size-full animate-ping rounded-full bg-amber-400 opacity-30" />
-
         <span className="relative inline-flex size-3 rounded-full bg-amber-500" />
       </span>
 
       In Progress
     </span>
-  );
-}
-
-/* =========================================================
-   INFORMATION ITEM
-   ========================================================= */
-
-function InformationItem({
-  label,
-  value,
-}: InformationItemProps) {
-  const displayValue =
-    value === undefined ||
-    value === null ||
-    value === ""
-      ? "—"
-      : String(value);
-
-  return (
-    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950/50">
-      <p className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-        {label}
-      </p>
-
-      <p className="mt-2 break-words text-sm font-semibold text-gray-900 dark:text-white">
-        {displayValue}
-      </p>
-    </div>
   );
 }
 
@@ -559,7 +546,7 @@ function EvidenceGallery({
 
   return (
     <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
-      <div className="flex flex-col gap-4 border-b border-gray-200 px-5 py-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+      <div className="flex flex-col gap-4 border-b border-gray-200 px-5 py-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <span
             className={`flex size-10 items-center justify-center rounded-xl ${
@@ -626,7 +613,7 @@ function EvidenceGallery({
       </div>
 
       {selectedFiles.length > 0 ? (
-        <div className="border-b border-gray-200 bg-blue-50 px-5 py-3 text-xs font-semibold text-blue-700 dark:border-gray-800 dark:bg-blue-950/20 dark:text-blue-400 sm:px-6">
+        <div className="border-b border-gray-200 bg-blue-50 px-5 py-3 text-xs font-semibold text-blue-700 dark:border-gray-800 dark:bg-blue-950/20 dark:text-blue-400">
           {selectedFiles.length} image
           {selectedFiles.length === 1
             ? ""
@@ -636,7 +623,7 @@ function EvidenceGallery({
       ) : null}
 
       {evidences.length === 0 ? (
-        <div className="px-5 py-12 text-center sm:px-6">
+        <div className="px-5 py-12 text-center">
           <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400 dark:bg-gray-800">
             <ImageIcon />
           </div>
@@ -646,13 +633,11 @@ function EvidenceGallery({
           </p>
 
           <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-            Select JPG, JPEG, PNG or WEBP
-            images. Maximum file size is
-            10 MB.
+            JPG, JPEG, PNG or WEBP. Maximum 10 MB per image.
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 sm:p-6 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
           {evidences.map(
             (evidence, index) => {
               const deleting =
@@ -666,7 +651,9 @@ function EvidenceGallery({
 
               return (
                 <article
-                  key={evidence._id}
+                  key={
+                    evidence._id
+                  }
                   className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950/50"
                 >
                   <a
@@ -731,7 +718,10 @@ function LoadingView() {
     <div className="space-y-4 p-5 sm:p-6">
       <div className="h-32 animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-800" />
       <div className="h-64 animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-800" />
-      <div className="h-64 animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-800" />
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <div className="h-72 animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-800" />
+        <div className="h-72 animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-800" />
+      </div>
     </div>
   );
 }
@@ -740,22 +730,23 @@ function LoadingView() {
    MAIN PAGE
    ========================================================= */
 
-export default function RiskDetailsPage() {
+export default function TaskDetailsPage() {
   const navigate =
     useNavigate();
 
   const {
-    riskId,
+    taskId,
   } = useParams<{
-    riskId: string;
+    taskId: string;
   }>();
 
   const [searchParams] =
     useSearchParams();
 
   const isUpdateMode =
-    searchParams.get("mode") ===
-    "update";
+    searchParams.get(
+      "mode"
+    ) === "update";
 
   const beforeInputRef =
     useRef<HTMLInputElement | null>(
@@ -771,7 +762,7 @@ export default function RiskDetailsPage() {
     details,
     setDetails,
   ] =
-    useState<RiskDetailsResult | null>(
+    useState<TaskDetailsResult | null>(
       null
     );
 
@@ -787,7 +778,7 @@ export default function RiskDetailsPage() {
     form,
     setForm,
   ] =
-    useState<RiskUpdateForm>(
+    useState<TaskUpdateForm>(
       INITIAL_FORM
     );
 
@@ -800,17 +791,20 @@ export default function RiskDetailsPage() {
   const [
     beforeFiles,
     setBeforeFiles,
-  ] = useState<File[]>([]);
+  ] =
+    useState<File[]>([]);
 
   const [
     afterFiles,
     setAfterFiles,
-  ] = useState<File[]>([]);
+  ] =
+    useState<File[]>([]);
 
   const [
     loading,
     setLoading,
-  ] = useState(true);
+  ] =
+    useState(true);
 
   const [
     busyAction,
@@ -821,15 +815,19 @@ export default function RiskDetailsPage() {
   const [
     error,
     setError,
-  ] = useState("");
+  ] =
+    useState("");
 
   const [
     success,
     setSuccess,
-  ] = useState("");
+  ] =
+    useState("");
 
   const busy =
-    Boolean(busyAction);
+    Boolean(
+      busyAction
+    );
 
   /* =======================================================
      LOAD DETAILS
@@ -840,9 +838,9 @@ export default function RiskDetailsPage() {
       async (
         showMainLoader = false
       ) => {
-        if (!riskId) {
+        if (!taskId) {
           setError(
-            "Risk ID is missing."
+            "Task ID is missing."
           );
 
           setLoading(false);
@@ -851,27 +849,31 @@ export default function RiskDetailsPage() {
         }
 
         try {
-          if (showMainLoader) {
+          if (
+            showMainLoader
+          ) {
             setLoading(true);
           }
 
           setError("");
 
           const result =
-            await getRiskById(
-              riskId
+            await getTaskById(
+              taskId
             );
 
-          setDetails(result);
+          setDetails(
+            result
+          );
 
           setForm({
-            riskRegisterId:
-              result.risk
-                .riskRegisterId ||
+            taskRegisterId:
+              result.task
+                .taskRegisterId ||
               "",
 
             description:
-              result.risk
+              result.task
                 .description ||
               "",
           });
@@ -879,22 +881,31 @@ export default function RiskDetailsPage() {
           try {
             const projectResult =
               await getProjectById(
-                result.risk.projectId
+                result.task
+                  .projectId
               );
 
             setProject(
               projectResult
             );
-          } catch (projectError) {
+          } catch (
+            projectError
+          ) {
             console.warn(
-              "Risk project details could not be loaded:",
+              "Task project details could not be loaded:",
               projectError
             );
 
-            setProject(null);
+            setProject(
+              null
+            );
           }
-        } catch (requestError) {
-          setDetails(null);
+        } catch (
+          requestError
+        ) {
+          setDetails(
+            null
+          );
 
           setError(
             getErrorMessage(
@@ -902,201 +913,219 @@ export default function RiskDetailsPage() {
             )
           );
         } finally {
-          setLoading(false);
+          setLoading(
+            false
+          );
         }
       },
-      [riskId]
+      [taskId]
     );
 
   useEffect(() => {
-    void loadDetails(true);
+    void loadDetails(
+      true
+    );
   }, [loadDetails]);
 
   /* =======================================================
-     COMPUTED PROJECT VALUES
+     COMPUTED VALUES
      ======================================================= */
 
   const projectReferenceNo =
     useMemo(() => {
-      if (project) {
+      if (
+        project
+      ) {
         return (
           getProjectReferenceNumber(
             project
           ) ||
-          details?.risk
+          details?.task
             .projectReferenceNo ||
-          details?.risk
+          details?.task
             .projectCode ||
           ""
         );
       }
 
       return (
-        details?.risk
+        details?.task
           .projectReferenceNo ||
-        details?.risk
+        details?.task
           .projectCode ||
         ""
       );
     }, [
-      details?.risk.projectCode,
-      details?.risk.projectReferenceNo,
+      details?.task.projectCode,
+      details?.task.projectReferenceNo,
       project,
     ]);
 
-  const riskRegisterIdEnabled =
-    project?.settings
-      ?.riskRegisterIdEnabled ===
-    true;
+  const taskRegisterIdEnabled =
+    isTaskRegisterIdEnabled(
+      project
+    );
 
-  const riskTitle =
-    details?.risk.riskRegisterId ||
-    (details
-      ? `Risk #${details.risk.serialNo}`
-      : "Risk Details");
+  const taskLabel =
+    details
+      ? details.task
+          .taskRegisterId ||
+        `Task #${
+          details.task
+            .displaySrNo ||
+          details.task
+            .serialNo
+        }`
+      : "Task Details";
 
   /* =======================================================
-     FORM UPDATE
+     FORM
      ======================================================= */
 
   const updateField = <
-    Key extends keyof RiskUpdateForm,
+    Key extends keyof TaskUpdateForm,
   >(
     field: Key,
-    value: RiskUpdateForm[Key]
+    value: TaskUpdateForm[Key]
   ) => {
-    setForm((current) => ({
-      ...current,
+    setForm(
+      (current) => ({
+        ...current,
+        [field]: value,
+      })
+    );
 
-      [field]:
-        value,
-    }));
-
-    setFormErrors((current) => ({
-      ...current,
-
-      [field]:
-        undefined,
-    }));
+    setFormErrors(
+      (current) => ({
+        ...current,
+        [field]:
+          undefined,
+      })
+    );
 
     setError("");
     setSuccess("");
   };
 
-  const resetUpdateForm = () => {
-    if (!details) {
-      return;
-    }
+  const resetUpdateForm =
+    () => {
+      if (!details) {
+        return;
+      }
 
-    setForm({
-      riskRegisterId:
-        details.risk
-          .riskRegisterId ||
-        "",
+      setForm({
+        taskRegisterId:
+          details.task
+            .taskRegisterId ||
+          "",
 
-      description:
-        details.risk
-          .description ||
-        "",
-    });
+        description:
+          details.task
+            .description ||
+          "",
+      });
 
-    setFormErrors({});
-    setError("");
-  };
-
-  /* =======================================================
-     UPDATE RISK
-     ======================================================= */
-
-  const handleUpdate = async (
-    event: FormEvent<HTMLFormElement>
-  ) => {
-    event.preventDefault();
-
-    if (
-      !riskId ||
-      !details
-    ) {
-      return;
-    }
-
-    const validationErrors =
-      validateForm(
-        form,
-        riskRegisterIdEnabled
-      );
-
-    if (
-      Object.keys(
-        validationErrors
-      ).length > 0
-    ) {
-      setFormErrors(
-        validationErrors
-      );
-
-      return;
-    }
-
-    const payload:
-      UpdateRiskPayload = {
-      description:
-        form.description.trim(),
+      setFormErrors({});
+      setError("");
     };
 
-    if (
-      riskRegisterIdEnabled
-    ) {
-      const riskRegisterId =
-        form.riskRegisterId
-          .trim()
-          .toUpperCase();
+  const handleUpdate =
+    async (
+      event:
+        FormEvent<HTMLFormElement>
+    ) => {
+      event.preventDefault();
 
-      payload.riskRegisterId =
-        riskRegisterId ||
-        null;
-    }
+      if (
+        !taskId ||
+        !details
+      ) {
+        return;
+      }
 
-    try {
-      setBusyAction("update");
-      setError("");
-      setSuccess("");
+      const validationErrors =
+        validateForm(
+          form,
+          taskRegisterIdEnabled
+        );
 
-      await updateRisk(
-        riskId,
-        payload
-      );
+      if (
+        Object.keys(
+          validationErrors
+        ).length > 0
+      ) {
+        setFormErrors(
+          validationErrors
+        );
 
-      await loadDetails();
+        return;
+      }
 
-      setSuccess(
-        "Risk updated successfully."
-      );
+      const payload:
+        UpdateTaskPayload = {
+        description:
+          form.description.trim(),
+      };
 
-      navigate(
-        `/risks/${riskId}`,
-        {
-          replace: true,
-        }
-      );
-    } catch (requestError) {
-      setError(
-        getErrorMessage(
-          requestError
-        )
-      );
-    } finally {
-      setBusyAction("");
-    }
-  };
+      if (
+        taskRegisterIdEnabled
+      ) {
+        const taskRegisterId =
+          form.taskRegisterId
+            .trim()
+            .toUpperCase();
+
+        payload.taskRegisterId =
+          taskRegisterId ||
+          null;
+      }
+
+      try {
+        setBusyAction(
+          "update"
+        );
+
+        setError("");
+        setSuccess("");
+
+        await updateTask(
+          taskId,
+          payload
+        );
+
+        await loadDetails();
+
+        setSuccess(
+          "Task updated successfully."
+        );
+
+        navigate(
+          `/tasks/${taskId}`,
+          {
+            replace: true,
+          }
+        );
+      } catch (
+        requestError
+      ) {
+        setError(
+          getErrorMessage(
+            requestError
+          )
+        );
+      } finally {
+        setBusyAction("");
+      }
+    };
 
   /* =======================================================
-     FILE SELECTION
+     FILES
      ======================================================= */
 
   const handleFileChange = (
     type: EvidenceType,
-    event: ChangeEvent<HTMLInputElement>
+    event:
+      ChangeEvent<HTMLInputElement>
   ) => {
     const files =
       Array.from(
@@ -1110,10 +1139,14 @@ export default function RiskDetailsPage() {
       );
 
     if (fileError) {
-      setError(fileError);
+      setError(
+        fileError
+      );
+
       setSuccess("");
 
-      event.target.value = "";
+      event.target.value =
+        "";
 
       if (
         type === "before"
@@ -1129,9 +1162,13 @@ export default function RiskDetailsPage() {
     if (
       type === "before"
     ) {
-      setBeforeFiles(files);
+      setBeforeFiles(
+        files
+      );
     } else {
-      setAfterFiles(files);
+      setAfterFiles(
+        files
+      );
     }
 
     setError("");
@@ -1146,7 +1183,7 @@ export default function RiskDetailsPage() {
     async (
       type: EvidenceType
     ) => {
-      if (!riskId) {
+      if (!taskId) {
         return;
       }
 
@@ -1171,7 +1208,9 @@ export default function RiskDetailsPage() {
         );
 
       if (fileError) {
-        setError(fileError);
+        setError(
+          fileError
+        );
 
         return;
       }
@@ -1188,11 +1227,13 @@ export default function RiskDetailsPage() {
           type === "before"
         ) {
           await uploadBeforeEvidence(
-            riskId,
+            taskId,
             files
           );
 
-          setBeforeFiles([]);
+          setBeforeFiles(
+            []
+          );
 
           if (
             beforeInputRef.current
@@ -1202,11 +1243,13 @@ export default function RiskDetailsPage() {
           }
         } else {
           await uploadAfterEvidence(
-            riskId,
+            taskId,
             files
           );
 
-          setAfterFiles([]);
+          setAfterFiles(
+            []
+          );
 
           if (
             afterInputRef.current
@@ -1221,7 +1264,9 @@ export default function RiskDetailsPage() {
         setSuccess(
           `${type === "before" ? "Before" : "After"} Evidence uploaded successfully.`
         );
-      } catch (requestError) {
+      } catch (
+        requestError
+      ) {
         setError(
           getErrorMessage(
             requestError
@@ -1240,7 +1285,7 @@ export default function RiskDetailsPage() {
     async (
       evidence: Evidence
     ) => {
-      if (!riskId) {
+      if (!taskId) {
         return;
       }
 
@@ -1262,7 +1307,7 @@ export default function RiskDetailsPage() {
         setSuccess("");
 
         await deleteEvidence(
-          riskId,
+          taskId,
           evidence._id
         );
 
@@ -1271,7 +1316,9 @@ export default function RiskDetailsPage() {
         setSuccess(
           "Evidence image deleted successfully."
         );
-      } catch (requestError) {
+      } catch (
+        requestError
+      ) {
         setError(
           getErrorMessage(
             requestError
@@ -1283,13 +1330,13 @@ export default function RiskDetailsPage() {
     };
 
   /* =======================================================
-     MARK COMPLETE
+     COMPLETE / REOPEN
      ======================================================= */
 
   const handleMarkComplete =
     async () => {
       if (
-        !riskId ||
+        !taskId ||
         !details
       ) {
         return;
@@ -1314,16 +1361,18 @@ export default function RiskDetailsPage() {
         setError("");
         setSuccess("");
 
-        await markRiskComplete(
-          riskId
+        await markTaskComplete(
+          taskId
         );
 
         await loadDetails();
 
         setSuccess(
-          "Risk marked Complete successfully."
+          "Task marked Complete successfully."
         );
-      } catch (requestError) {
+      } catch (
+        requestError
+      ) {
         setError(
           getErrorMessage(
             requestError
@@ -1334,13 +1383,9 @@ export default function RiskDetailsPage() {
       }
     };
 
-  /* =======================================================
-     MARK IN PROGRESS
-     ======================================================= */
-
   const handleMarkInProgress =
     async () => {
-      if (!riskId) {
+      if (!taskId) {
         return;
       }
 
@@ -1352,16 +1397,18 @@ export default function RiskDetailsPage() {
         setError("");
         setSuccess("");
 
-        await markRiskInProgress(
-          riskId
+        await markTaskInProgress(
+          taskId
         );
 
         await loadDetails();
 
         setSuccess(
-          "Risk moved to In Progress."
+          "Task moved to In Progress."
         );
-      } catch (requestError) {
+      } catch (
+        requestError
+      ) {
         setError(
           getErrorMessage(
             requestError
@@ -1372,13 +1419,12 @@ export default function RiskDetailsPage() {
       }
     };
 
-  /* =======================================================
-     CLOSE DRAWER
-     ======================================================= */
-
-  const handleClose = () => {
-    navigate("/risks");
-  };
+  const handleClose =
+    () => {
+      navigate(
+        "/tasks"
+      );
+    };
 
   /* =======================================================
      RENDER
@@ -1388,34 +1434,36 @@ export default function RiskDetailsPage() {
     <div className="fixed inset-0 z-[100] overflow-hidden">
       <button
         type="button"
-        aria-label="Close Risk details"
-        onClick={handleClose}
+        aria-label="Close Task details"
+        onClick={
+          handleClose
+        }
         className="absolute inset-0 size-full bg-gray-950/45 backdrop-blur-[2px]"
       />
 
-      <aside className="absolute inset-y-0 right-0 flex w-full max-w-6xl flex-col bg-gray-50 shadow-2xl dark:bg-gray-950">
-        {/* =================================================
-            DRAWER HEADER
-            ================================================= */}
+      <aside className="absolute inset-y-0 right-0 flex w-full max-w-7xl flex-col bg-gray-50 shadow-2xl dark:bg-gray-950">
+        {/* HEADER */}
 
         <header className="flex shrink-0 items-center justify-between gap-4 border-b border-gray-200 bg-white px-4 py-4 dark:border-gray-800 dark:bg-gray-900 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <button
               type="button"
-              onClick={handleClose}
-              className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 transition hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
-              aria-label="Back to Risk Register"
+              onClick={
+                handleClose
+              }
+              className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 transition hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
+              aria-label="Back to Task Register"
             >
               <BackIcon />
             </button>
 
             <div className="min-w-0">
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-400">
-                Risk Register
+                Task Register
               </p>
 
               <h1 className="mt-1 truncate text-lg font-bold text-gray-900 dark:text-white sm:text-xl">
-                {riskTitle}
+                {taskLabel}
               </h1>
             </div>
           </div>
@@ -1423,16 +1471,16 @@ export default function RiskDetailsPage() {
           <button
             type="button"
             title="Close"
-            onClick={handleClose}
-            className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-red-900 dark:hover:bg-red-950/30 dark:hover:text-red-400"
+            onClick={
+              handleClose
+            }
+            className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
           >
             <CloseIcon />
           </button>
         </header>
 
-        {/* =================================================
-            CONTENT
-            ================================================= */}
+        {/* CONTENT */}
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           {loading ? (
@@ -1442,22 +1490,20 @@ export default function RiskDetailsPage() {
               <div className="rounded-2xl border border-red-200 bg-red-50 p-5 dark:border-red-900 dark:bg-red-950/30">
                 <p className="text-sm font-semibold text-red-700 dark:text-red-400">
                   {error ||
-                    "Risk details could not be loaded."}
+                    "Task details could not be loaded."}
                 </p>
 
                 <Link
-                  to="/risks"
+                  to="/tasks"
                   className="mt-4 inline-flex text-sm font-bold text-red-700 underline"
                 >
-                  Back to Risk Register
+                  Back to Task Register
                 </Link>
               </div>
             </div>
           ) : (
             <div className="space-y-5 p-4 sm:p-6">
-              {/* ===========================================
-                  MESSAGES
-                  =========================================== */}
+              {/* MESSAGES */}
 
               {error ? (
                 <div className="rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/30">
@@ -1475,17 +1521,15 @@ export default function RiskDetailsPage() {
                 </div>
               ) : null}
 
-              {/* ===========================================
-                  RISK HEADER
-                  =========================================== */}
+              {/* TASK SUMMARY */}
 
               <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-6">
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-3">
                       <StatusBadge
                         status={
-                          details.risk
+                          details.task
                             .status
                         }
                       />
@@ -1497,31 +1541,55 @@ export default function RiskDetailsPage() {
 
                       <span className="inline-flex rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-bold text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
                         Sr. No.{" "}
-                        {
-                          details.risk
-                            .serialNo
-                        }
+                        {details.task
+                          .displaySrNo ||
+                          details.task
+                            .serialNo}
                       </span>
+
+                      {details.task
+                        .taskRegisterId ? (
+                        <span className="inline-flex rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-400">
+                          {
+                            details.task
+                              .taskRegisterId
+                          }
+                        </span>
+                      ) : null}
                     </div>
 
-                    <h2 className="mt-5 text-xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-2xl">
-                      {details.risk
-                        .riskRegisterId ||
-                        `Risk #${details.risk.serialNo}`}
-                    </h2>
-
-                    <p className="mt-3 max-w-4xl whitespace-pre-wrap text-sm leading-7 text-gray-600 dark:text-gray-300">
+                    <p className="mt-5 max-w-5xl whitespace-pre-wrap text-base leading-8 text-gray-700 dark:text-gray-300">
                       {
-                        details.risk
+                        details.task
                           .description
                       }
                     </p>
+
+                    <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-xs text-gray-500 dark:text-gray-400">
+                      <span>
+                        Created:{" "}
+                        {formatDateTime(
+                          details.task
+                            .createdAt
+                        )}
+                      </span>
+
+                      <span>
+                        Updated:{" "}
+                        {formatDateTime(
+                          details.task
+                            .updatedAt
+                        )}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="flex shrink-0 flex-wrap gap-2">
                     <button
                       type="button"
-                      disabled={busy}
+                      disabled={
+                        busy
+                      }
                       onClick={() => {
                         setBusyAction(
                           "refresh"
@@ -1535,7 +1603,7 @@ export default function RiskDetailsPage() {
                           }
                         );
                       }}
-                      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-4 text-xs font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
+                      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-4 text-xs font-semibold text-gray-700 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
                     >
                       <span
                         className={
@@ -1554,16 +1622,17 @@ export default function RiskDetailsPage() {
                     {!isUpdateMode ? (
                       <button
                         type="button"
-                        disabled={busy}
+                        disabled={
+                          busy
+                        }
                         onClick={() =>
                           navigate(
-                            `/risks/${riskId}?mode=update`
+                            `/tasks/${taskId}?mode=update`
                           )
                         }
-                        className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-400"
+                        className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 text-xs font-semibold text-amber-700 disabled:opacity-50 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-400"
                       >
                         <EditIcon />
-
                         Update
                       </button>
                     ) : null}
@@ -1571,162 +1640,86 @@ export default function RiskDetailsPage() {
                 </div>
               </section>
 
-              {/* ===========================================
-                  VIEW OR UPDATE
-                  =========================================== */}
+              {/* UPDATE FORM */}
 
               {isUpdateMode ? (
                 <form
-                  onSubmit={handleUpdate}
+                  onSubmit={
+                    handleUpdate
+                  }
                   className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-white/[0.03]"
                 >
                   <div className="border-b border-gray-200 px-5 py-4 dark:border-gray-800 sm:px-6">
                     <h2 className="text-base font-bold text-gray-900 dark:text-white">
-                      Update Risk
+                      Update Task
                     </h2>
 
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      Risk description aur
-                      optional Risk Register
-                      ID update karein.
+                      Description aur optional Task Register ID update karein.
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-5 p-5 sm:p-6 md:grid-cols-2">
-                    <div>
-                      <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
-                        Project
-                      </label>
-
-                      <input
-                        type="text"
-                        readOnly
-                        value={
-                          project?.title ||
-                          projectReferenceNo
-                        }
-                        className={`${INPUT_CLASSES} cursor-not-allowed bg-gray-100 font-semibold dark:bg-gray-900`}
-                      />
-
-                      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                        Risk ko doosray
-                        project mein move
-                        nahi kiya ja sakta.
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
-                        Serial No.
-                      </label>
-
-                      <input
-                        type="text"
-                        readOnly
-                        value={
-                          details.risk
-                            .serialNo
-                        }
-                        className={`${INPUT_CLASSES} cursor-not-allowed bg-gray-100 font-bold dark:bg-gray-900`}
-                      />
-
-                      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                        Serial number
-                        automatically generated
-                        aur immutable hai.
-                      </p>
-                    </div>
-
-                    <div className="md:col-span-2">
-                      {riskRegisterIdEnabled ? (
-                        <>
-                          <div className="mb-2 flex items-center justify-between gap-3">
-                            <label
-                              htmlFor="updateRiskRegisterId"
-                              className="block text-sm font-semibold text-gray-700 dark:text-gray-300"
-                            >
-                              Risk Register ID
-                            </label>
-
-                            <span className="text-xs font-medium text-gray-400">
-                              Optional
-                            </span>
-                          </div>
-
-                          <input
-                            id="updateRiskRegisterId"
-                            type="text"
-                            value={
-                              form.riskRegisterId
-                            }
-                            disabled={busy}
-                            maxLength={100}
-                            onChange={(event) =>
-                              updateField(
-                                "riskRegisterId",
-                                normalizeUppercaseValue(
-                                  event.target.value
-                                )
-                              )
-                            }
-                            placeholder="Example: R-001"
-                            className={`${INPUT_CLASSES} uppercase ${
-                              formErrors.riskRegisterId
-                                ? "border-red-400 focus:border-red-500 focus:ring-red-100"
-                                : ""
-                            }`}
-                          />
-
-                          <FieldError
-                            message={
-                              formErrors
-                                .riskRegisterId
-                            }
-                          />
-
-                          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                            Blank save karne
-                            par existing Risk
-                            Register ID remove
-                            ho jayegi.
-                          </p>
-                        </>
-                      ) : (
-                        <>
-                          <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
-                            Risk Register ID
+                  <div className="grid grid-cols-1 gap-5 p-5 sm:p-6">
+                    {taskRegisterIdEnabled ? (
+                      <div>
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                          <label
+                            htmlFor="updateTaskRegisterId"
+                            className="block text-sm font-semibold text-gray-700 dark:text-gray-300"
+                          >
+                            Task Register ID
                           </label>
 
-                          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900">
-                            <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                              {details.risk
-                                .riskRegisterId ||
-                                "No Risk Register ID assigned"}
-                            </p>
+                          <span className="text-xs text-gray-400">
+                            Optional
+                          </span>
+                        </div>
 
-                            <p className="mt-2 text-xs leading-5 text-gray-500 dark:text-gray-400">
-                              Risk Register ID
-                              is project ki
-                              settings mein
-                              disabled hai.
-                              Existing value
-                              preserve rahegi,
-                              lekin edit nahi
-                              hogi.
-                            </p>
-                          </div>
-                        </>
-                      )}
-                    </div>
+                        <input
+                          id="updateTaskRegisterId"
+                          type="text"
+                          value={
+                            form.taskRegisterId
+                          }
+                          disabled={
+                            busy
+                          }
+                          maxLength={
+                            100
+                          }
+                          onChange={(
+                            event
+                          ) =>
+                            updateField(
+                              "taskRegisterId",
+                              normalizeUppercaseValue(
+                                event.target.value
+                              )
+                            )
+                          }
+                          placeholder="Example: T-001"
+                          className={`${INPUT_CLASSES} uppercase ${
+                            formErrors.taskRegisterId
+                              ? "border-red-400 focus:border-red-500 focus:ring-red-100"
+                              : ""
+                          }`}
+                        />
 
-                    <div className="md:col-span-2">
+                        <FieldError
+                          message={
+                            formErrors.taskRegisterId
+                          }
+                        />
+                      </div>
+                    ) : null}
+
+                    <div>
                       <div className="mb-2 flex items-center justify-between gap-4">
                         <label
                           htmlFor="updateDescription"
                           className="block text-sm font-semibold text-gray-700 dark:text-gray-300"
                         >
                           Description
-
                           <span className="ml-1 text-red-500">
                             *
                           </span>
@@ -1746,15 +1739,20 @@ export default function RiskDetailsPage() {
                         value={
                           form.description
                         }
-                        disabled={busy}
-                        maxLength={3000}
-                        onChange={(event) =>
+                        disabled={
+                          busy
+                        }
+                        maxLength={
+                          3000
+                        }
+                        onChange={(
+                          event
+                        ) =>
                           updateField(
                             "description",
                             event.target.value
                           )
                         }
-                        placeholder="Describe the complete risk finding clearly..."
                         className={`${TEXTAREA_CLASSES} ${
                           formErrors.description
                             ? "border-red-400 focus:border-red-500 focus:ring-red-100"
@@ -1773,26 +1771,30 @@ export default function RiskDetailsPage() {
                   <div className="flex flex-col-reverse gap-3 border-t border-gray-200 px-5 py-4 dark:border-gray-800 sm:flex-row sm:justify-end sm:px-6">
                     <button
                       type="button"
-                      disabled={busy}
+                      disabled={
+                        busy
+                      }
                       onClick={() => {
                         resetUpdateForm();
 
                         navigate(
-                          `/risks/${riskId}`,
+                          `/tasks/${taskId}`,
                           {
                             replace: true,
                           }
                         );
                       }}
-                      className="inline-flex h-11 items-center justify-center rounded-xl border border-gray-300 bg-white px-5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
+                      className="inline-flex h-11 items-center justify-center rounded-xl border border-gray-300 bg-white px-5 text-sm font-semibold text-gray-700 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
                     >
                       Cancel
                     </button>
 
                     <button
                       type="submit"
-                      disabled={busy}
-                      className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={
+                        busy
+                      }
+                      className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 text-sm font-semibold text-white disabled:opacity-50"
                     >
                       <CheckIcon />
 
@@ -1803,84 +1805,19 @@ export default function RiskDetailsPage() {
                     </button>
                   </div>
                 </form>
-              ) : (
-                <section className="grid grid-cols-1 gap-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-6 md:grid-cols-2 xl:grid-cols-3">
-                  <InformationItem
-                    label="Project"
-                    value={
-                      project?.title
-                    }
-                  />
+              ) : null}
 
-                  <InformationItem
-                    label="Project Reference No."
-                    value={
-                      projectReferenceNo
-                    }
-                  />
-
-                  <InformationItem
-                    label="Serial No."
-                    value={
-                      details.risk
-                        .serialNo
-                    }
-                  />
-
-                  <InformationItem
-                    label="Risk Register ID"
-                    value={
-                      details.risk
-                        .riskRegisterId
-                    }
-                  />
-
-                  <InformationItem
-                    label="Risk Register ID Setting"
-                    value={
-                      project
-                        ? riskRegisterIdEnabled
-                          ? "Enabled"
-                          : "Disabled"
-                        : "Unavailable"
-                    }
-                  />
-
-                  <InformationItem
-                    label="Created"
-                    value={formatDateTime(
-                      details.risk
-                        .createdAt
-                    )}
-                  />
-
-                  <InformationItem
-                    label="Last Updated"
-                    value={formatDateTime(
-                      details.risk
-                        .updatedAt
-                    )}
-                  />
-                </section>
-              )}
-
-              {/* ===========================================
-                  WORKFLOW STATUS
-                  =========================================== */}
+              {/* WORKFLOW */}
 
               <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-6">
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <h2 className="text-base font-bold text-gray-900 dark:text-white">
-                      Completion Workflow
+                      Task Completion
                     </h2>
 
                     <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                      Complete status ke
-                      liye kam az kam aik
-                      Before aur aik After
-                      Evidence image required
-                      hai.
+                      Complete karne ke liye kam az kam 1 Before aur 1 After Evidence image required hai.
                     </p>
 
                     <div className="mt-4 flex flex-wrap gap-3">
@@ -1916,116 +1853,135 @@ export default function RiskDetailsPage() {
                     </div>
                   </div>
 
-                  {details.risk.status ===
-                  "complete" ? (
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => {
-                        void handleMarkInProgress();
-                      }}
-                      className="inline-flex h-11 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 px-5 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-400"
-                    >
-                      {busyAction ===
-                      "in_progress"
-                        ? "Updating..."
-                        : "Move to In Progress"}
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={
-                        busy ||
-                        !details.evidence
-                          .canMarkComplete
-                      }
-                      onClick={() => {
-                        void handleMarkComplete();
-                      }}
-                      className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <CheckIcon />
+                  <div>
+                    {details.task
+                      .status !==
+                    "complete" ? (
+                      <button
+                        type="button"
+                        disabled={
+                          busy ||
+                          !details.evidence
+                            .canMarkComplete
+                        }
+                        onClick={() => {
+                          void handleMarkComplete();
+                        }}
+                        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <CheckIcon />
 
-                      {busyAction ===
-                      "complete"
-                        ? "Completing..."
-                        : "Mark Complete"}
-                    </button>
-                  )}
+                        {busyAction ===
+                        "complete"
+                          ? "Completing..."
+                          : "Mark Complete"}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={
+                          busy
+                        }
+                        onClick={() => {
+                          void handleMarkInProgress();
+                        }}
+                        className="inline-flex h-11 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 px-5 text-sm font-semibold text-amber-700 disabled:opacity-50 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-400"
+                      >
+                        {busyAction ===
+                        "in_progress"
+                          ? "Updating..."
+                          : "Reopen Task"}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </section>
 
-              {/* ===========================================
-                  BEFORE EVIDENCE
-                  =========================================== */}
+              {/* BEFORE / AFTER SIDE BY SIDE */}
 
-              <EvidenceGallery
-                title="Before Evidence"
-                type="before"
-                evidences={
-                  details.evidence.before
-                }
-                selectedFiles={
-                  beforeFiles
-                }
-                inputRef={
-                  beforeInputRef
-                }
-                disabled={busy}
-                busyAction={busyAction}
-                onFilesChange={(event) =>
-                  handleFileChange(
-                    "before",
+              <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                <EvidenceGallery
+                  title="Before Evidence"
+                  type="before"
+                  evidences={
+                    details.evidence
+                      .before
+                  }
+                  selectedFiles={
+                    beforeFiles
+                  }
+                  inputRef={
+                    beforeInputRef
+                  }
+                  disabled={
+                    busy
+                  }
+                  busyAction={
+                    busyAction
+                  }
+                  onFilesChange={(
                     event
-                  )
-                }
-                onUpload={() => {
-                  void handleEvidenceUpload(
-                    "before"
-                  );
-                }}
-                onDelete={(evidence) => {
-                  void handleDeleteEvidence(
+                  ) =>
+                    handleFileChange(
+                      "before",
+                      event
+                    )
+                  }
+                  onUpload={() => {
+                    void handleEvidenceUpload(
+                      "before"
+                    );
+                  }}
+                  onDelete={(
                     evidence
-                  );
-                }}
-              />
+                  ) => {
+                    void handleDeleteEvidence(
+                      evidence
+                    );
+                  }}
+                />
 
-              {/* ===========================================
-                  AFTER EVIDENCE
-                  =========================================== */}
-
-              <EvidenceGallery
-                title="After Evidence"
-                type="after"
-                evidences={
-                  details.evidence.after
-                }
-                selectedFiles={
-                  afterFiles
-                }
-                inputRef={
-                  afterInputRef
-                }
-                disabled={busy}
-                busyAction={busyAction}
-                onFilesChange={(event) =>
-                  handleFileChange(
-                    "after",
+                <EvidenceGallery
+                  title="After Evidence"
+                  type="after"
+                  evidences={
+                    details.evidence
+                      .after
+                  }
+                  selectedFiles={
+                    afterFiles
+                  }
+                  inputRef={
+                    afterInputRef
+                  }
+                  disabled={
+                    busy
+                  }
+                  busyAction={
+                    busyAction
+                  }
+                  onFilesChange={(
                     event
-                  )
-                }
-                onUpload={() => {
-                  void handleEvidenceUpload(
-                    "after"
-                  );
-                }}
-                onDelete={(evidence) => {
-                  void handleDeleteEvidence(
+                  ) =>
+                    handleFileChange(
+                      "after",
+                      event
+                    )
+                  }
+                  onUpload={() => {
+                    void handleEvidenceUpload(
+                      "after"
+                    );
+                  }}
+                  onDelete={(
                     evidence
-                  );
-                }}
-              />
+                  ) => {
+                    void handleDeleteEvidence(
+                      evidence
+                    );
+                  }}
+                />
+              </div>
             </div>
           )}
         </div>

@@ -5,7 +5,7 @@ import api from "../api";
    ========================================================= */
 
 export const DOCUMENT_LAYOUTS = [
-  "risk_register",
+  "task_register",
   "detailed_evidence",
   "summary",
 ] as const;
@@ -43,28 +43,28 @@ export type DocumentStatus =
    RISK STATUS FILTER
    ========================================================= */
 
-export const DOCUMENT_RISK_STATUS_FILTERS = [
+export const DOCUMENT_TASK_STATUS_FILTERS = [
   "all",
   "in_progress",
   "complete",
 ] as const;
 
-export type DocumentRiskStatusFilter =
-  (typeof DOCUMENT_RISK_STATUS_FILTERS)[number];
+export type DocumentTaskStatusFilter =
+  (typeof DOCUMENT_TASK_STATUS_FILTERS)[number];
 
 /* =========================================================
    RISK SORTING
    ========================================================= */
 
-export const DOCUMENT_RISK_SORT_FIELDS = [
+export const DOCUMENT_TASK_SORT_FIELDS = [
   "serialNo",
   "createdAt",
   "updatedAt",
   "status",
 ] as const;
 
-export type DocumentRiskSortField =
-  (typeof DOCUMENT_RISK_SORT_FIELDS)[number];
+export type DocumentTaskSortField =
+  (typeof DOCUMENT_TASK_SORT_FIELDS)[number];
 
 /* =========================================================
    DOCUMENT HISTORY SORTING
@@ -87,11 +87,9 @@ export type DocumentSortField =
    ========================================================= */
 
 export type DocumentFilters = {
-  statusFilter: DocumentRiskStatusFilter;
+  statusFilter: DocumentTaskStatusFilter;
 
   includeProjectDetails: boolean;
-
-  includeRiskRegisterId: boolean;
 
   includeBeforeEvidence: boolean;
 
@@ -103,9 +101,9 @@ export type DocumentFilters = {
 
   dateTo?: string;
 
-  selectedRiskIds: string[];
+  selectedTaskIds: string[];
 
-  sortBy: DocumentRiskSortField;
+  sortBy: DocumentTaskSortField;
 
   sortOrder: "asc" | "desc";
 };
@@ -115,11 +113,11 @@ export type DocumentFilters = {
    ========================================================= */
 
 export type DocumentSummary = {
-  totalRisks: number;
+  totalTasks: number;
 
-  inProgressRisks: number;
+  inProgressTasks: number;
 
-  completeRisks: number;
+  completeTasks: number;
 
   beforeEvidenceCount: number;
 
@@ -184,7 +182,7 @@ export type ProjectDocumentRecord = {
 
   filters: DocumentFilters;
 
-  exportedRiskIds: string[];
+  exportedTaskIds: string[];
 
   summary: DocumentSummary;
 
@@ -212,11 +210,9 @@ export type ProjectDocumentRecord = {
    ========================================================= */
 
 export type GenerateDocumentFiltersPayload = {
-  statusFilter?: DocumentRiskStatusFilter;
+  statusFilter?: DocumentTaskStatusFilter;
 
   includeProjectDetails?: boolean;
-
-  includeRiskRegisterId?: boolean;
 
   includeBeforeEvidence?: boolean;
 
@@ -228,9 +224,9 @@ export type GenerateDocumentFiltersPayload = {
 
   dateTo?: string;
 
-  selectedRiskIds?: string[];
+  selectedTaskIds?: string[];
 
-  sortBy?: DocumentRiskSortField;
+  sortBy?: DocumentTaskSortField;
 
   sortOrder?: "asc" | "desc";
 };
@@ -487,7 +483,7 @@ const normalizeDocumentLayout = (
     value as DocumentLayout
   )
     ? (value as DocumentLayout)
-    : "risk_register";
+    : "task_register";
 };
 
 const normalizeDocumentFormat = (
@@ -510,23 +506,23 @@ const normalizeDocumentStatus = (
     : "generating";
 };
 
-const normalizeRiskStatusFilter = (
+const normalizeTaskStatusFilter = (
   value: unknown
-): DocumentRiskStatusFilter => {
-  return DOCUMENT_RISK_STATUS_FILTERS.includes(
-    value as DocumentRiskStatusFilter
+): DocumentTaskStatusFilter => {
+  return DOCUMENT_TASK_STATUS_FILTERS.includes(
+    value as DocumentTaskStatusFilter
   )
-    ? (value as DocumentRiskStatusFilter)
+    ? (value as DocumentTaskStatusFilter)
     : "all";
 };
 
-const normalizeRiskSortField = (
+const normalizeTaskSortField = (
   value: unknown
-): DocumentRiskSortField => {
-  return DOCUMENT_RISK_SORT_FIELDS.includes(
-    value as DocumentRiskSortField
+): DocumentTaskSortField => {
+  return DOCUMENT_TASK_SORT_FIELDS.includes(
+    value as DocumentTaskSortField
   )
-    ? (value as DocumentRiskSortField)
+    ? (value as DocumentTaskSortField)
     : "serialNo";
 };
 
@@ -580,7 +576,7 @@ const normalizeDocumentFilters = (
 
   return {
     statusFilter:
-      normalizeRiskStatusFilter(
+      normalizeTaskStatusFilter(
         filters.statusFilter
       ),
 
@@ -589,13 +585,6 @@ const normalizeDocumentFilters = (
         .includeProjectDetails ===
       "boolean"
         ? filters.includeProjectDetails
-        : true,
-
-    includeRiskRegisterId:
-      typeof filters
-        .includeRiskRegisterId ===
-      "boolean"
-        ? filters.includeRiskRegisterId
         : true,
 
     includeBeforeEvidence:
@@ -631,13 +620,13 @@ const normalizeDocumentFilters = (
         }
       : {}),
 
-    selectedRiskIds:
+    selectedTaskIds:
       normalizeStringArray(
-        filters.selectedRiskIds
+        filters.selectedTaskIds
       ),
 
     sortBy:
-      normalizeRiskSortField(
+      normalizeTaskSortField(
         filters.sortBy
       ),
 
@@ -676,19 +665,19 @@ const normalizeDocumentSummary = (
     );
 
   return {
-    totalRisks:
+    totalTasks:
       normalizeNonNegativeInteger(
-        summary.totalRisks
+        summary.totalTasks
       ),
 
-    inProgressRisks:
+    inProgressTasks:
       normalizeNonNegativeInteger(
-        summary.inProgressRisks
+        summary.inProgressTasks
       ),
 
-    completeRisks:
+    completeTasks:
       normalizeNonNegativeInteger(
-        summary.completeRisks
+        summary.completeTasks
       ),
 
     beforeEvidenceCount,
@@ -895,9 +884,9 @@ const normalizeDocument = (
         document.filters
       ),
 
-    exportedRiskIds:
+    exportedTaskIds:
       normalizeStringArray(
-        document.exportedRiskIds
+        document.exportedTaskIds
       ),
 
     summary:
@@ -1166,16 +1155,6 @@ const prepareGeneratePayload = (
     if (
       hasOwnField(
         filters,
-        "includeRiskRegisterId"
-      )
-    ) {
-      preparedFilters.includeRiskRegisterId =
-        filters.includeRiskRegisterId;
-    }
-
-    if (
-      hasOwnField(
-        filters,
         "includeBeforeEvidence"
       )
     ) {
@@ -1219,15 +1198,15 @@ const prepareGeneratePayload = (
 
     if (
       Array.isArray(
-        filters.selectedRiskIds
+        filters.selectedTaskIds
       )
     ) {
-      preparedFilters.selectedRiskIds =
+      preparedFilters.selectedTaskIds =
         [
           ...new Set(
-            filters.selectedRiskIds
-              .map((riskId) =>
-                riskId.trim()
+            filters.selectedTaskIds
+              .map((taskId) =>
+                taskId.trim()
               )
               .filter(Boolean)
           ),
@@ -1258,7 +1237,7 @@ const prepareGeneratePayload = (
 
     layout:
       payload.layout ||
-      "risk_register",
+      "task_register",
 
     format:
       payload.format,
@@ -1658,7 +1637,7 @@ export const saveDocumentDownload =
 
    Generated file aur history record remove honge.
 
-   Original Project, Risks aur Evidence affect nahi honge.
+   Original Project, Tasks aur Evidence affect nahi honge.
    ========================================================= */
 
 export const deleteDocument =
@@ -1782,7 +1761,7 @@ export const getDocumentLayoutLabel =
       return "Summary";
     }
 
-    return "Risk Register";
+    return "Task Register";
   };
 
 export const getDocumentFormatLabel =

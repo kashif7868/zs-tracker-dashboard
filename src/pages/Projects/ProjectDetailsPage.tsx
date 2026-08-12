@@ -16,13 +16,19 @@ import {
 
 import {
   archiveProject,
+  completeProject,
   createProjectClientAccess,
   getProjectById,
   getProjectReferenceNumber,
+  putProjectOnHold,
+  reopenProject,
+  resumeProject,
   revokeProjectClientAccess,
+  startProject,
   type OverallRiskLevel,
   type Project,
   type ProjectProgress,
+  type ProjectScheduleStatus,
   type ProjectStatus,
   type ProjectType,
 } from "../../services/project/project.service";
@@ -36,6 +42,11 @@ type LocationState = {
 };
 
 type ActionLoading =
+  | "start"
+  | "hold"
+  | "resume"
+  | "complete"
+  | "reopen"
   | "archive"
   | "generate-access"
   | "revoke-access"
@@ -86,7 +97,8 @@ const EMPTY_PROGRESS: ProjectProgress = {
 
 const CLIENT_TRACKER_BASE_URL = (
   import.meta.env.VITE_CLIENT_TRACKER_URL?.trim() ||
-  "https://zorays-solar-risk-tracker-g8ef-cyan.vercel.app"
+  "http://localhost:5174"
+  // "https://zorays-solar-risk-tracker-g8ef-cyan.vercel.app"
 ).replace(/\/+$/, "");
 
 const buildClientProjectUrl = (
@@ -164,9 +176,6 @@ const formatStatus = (
     case "on_hold":
       return "On Hold";
 
-    case "awaiting_verification":
-      return "Awaiting Verification";
-
     case "completed":
       return "Completed";
 
@@ -175,6 +184,29 @@ const formatStatus = (
 
     default:
       return "Draft";
+  }
+};
+
+const formatScheduleStatus = (
+  status?: ProjectScheduleStatus
+): string => {
+  switch (status) {
+    case "not_started":
+      return "Not Started";
+    case "on_track":
+      return "On Track";
+    case "overdue":
+      return "Overdue";
+    case "completed_early":
+      return "Completed Early";
+    case "completed_on_time":
+      return "Completed On Time";
+    case "completed_late":
+      return "Completed Late";
+    case "archived":
+      return "Archived";
+    default:
+      return "On Track";
   }
 };
 
@@ -201,7 +233,7 @@ const formatProjectType = (
       return "Other";
 
     default:
-      return "Risk Rectification";
+      return "Other";
   }
 };
 
@@ -404,9 +436,6 @@ const getStatusClasses = (
 
     case "on_hold":
       return "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-500/20 dark:bg-orange-500/10 dark:text-orange-400";
-
-    case "awaiting_verification":
-      return "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-400";
 
     case "archived":
       return "border-gray-200 bg-gray-100 text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400";
@@ -966,18 +995,42 @@ export default function ProjectDetailsPage() {
   const progress =
     useMemo<ProjectProgress>(
       () =>
-        project
-          ?.progressBreakdown ||
+        project?.progressBreakdown ||
         EMPTY_PROGRESS,
-      [
-        project
-          ?.progressBreakdown,
-      ]
+      [project?.progressBreakdown]
     );
 
+  const riskSummary =
+    project?.riskSummary;
+
+  const trackerSummary =
+    project?.trackerSummary;
+
   const totalRiskGroups =
-    project?.riskSummary
-      .totalRiskGroups ||
+    riskSummary?.totalRiskGroups ??
+    trackerSummary?.totalRisks ??
+    0;
+
+  const totalEvidence =
+    riskSummary?.totalEvidence ??
+    trackerSummary?.totalEvidence ??
+    0;
+
+  const openRisks =
+    riskSummary?.open ?? 0;
+
+  const inProgressRisks =
+    riskSummary?.inProgress ??
+    trackerSummary?.inProgress ??
+    0;
+
+  const awaitingVerificationRisks =
+    riskSummary?.awaitingVerification ??
+    0;
+
+  const closedRisks =
+    riskSummary?.closed ??
+    trackerSummary?.complete ??
     0;
 
   const isArchived =
@@ -1005,22 +1058,38 @@ export default function ProjectDetailsPage() {
     );
 
   /* =======================================================
-     ARCHIVE
+     PROJECT LIFECYCLE
      ======================================================= */
 
-  const handleArchive =
-    async () => {
+  const handleLifecycleAction =
+    async (
+      action:
+        | "start"
+        | "hold"
+        | "resume"
+        | "complete"
+        | "reopen"
+        | "archive"
+    ) => {
       if (
         !project ||
-        actionLoading ||
-        isArchived
+        actionLoading
       ) {
         return;
       }
 
+      const actionLabels = {
+        start: "start",
+        hold: "put on hold",
+        resume: "resume",
+        complete: "mark as completed",
+        reopen: "reopen",
+        archive: "archive",
+      } as const;
+
       const confirmed =
         window.confirm(
-          `Are you sure you want to archive "${project.title}"?`
+          `Are you sure you want to ${actionLabels[action]} "${project.title}"?`
         );
 
       if (!confirmed) {
@@ -1028,43 +1097,90 @@ export default function ProjectDetailsPage() {
       }
 
       try {
-        setActionLoading(
-          "archive"
-        );
-
+        setActionLoading(action);
         setErrorMessage("");
 
-        const archivedProject =
-          await archiveProject(
-            project._id
-          );
+        let updatedProject: Project;
 
-        setProject(
-          archivedProject
-        );
+        switch (action) {
+          case "start":
+            updatedProject =
+              await startProject(
+                project._id
+              );
+            break;
+
+          case "hold":
+            updatedProject =
+              await putProjectOnHold(
+                project._id
+              );
+            break;
+
+          case "resume":
+            updatedProject =
+              await resumeProject(
+                project._id
+              );
+            break;
+
+          case "complete":
+            updatedProject =
+              await completeProject(
+                project._id
+              );
+            break;
+
+          case "reopen":
+            updatedProject =
+              await reopenProject(
+                project._id
+              );
+            break;
+
+          case "archive":
+            updatedProject =
+              await archiveProject(
+                project._id
+              );
+            break;
+        }
+
+        setProject(updatedProject);
 
         setClientAccessToken(
-          ""
+          updatedProject
+            .clientAccessToken ||
+            updatedProject
+              .clientAccess
+              ?.accessToken ||
+            ""
         );
 
         setSuccessMessage(
-          "Project successfully archive ho gaya."
+          action === "start"
+            ? "Project successfully start ho gaya."
+            : action === "hold"
+              ? "Project on hold kar diya gaya."
+              : action === "resume"
+                ? "Project successfully resume ho gaya."
+                : action === "complete"
+                  ? "Project successfully complete mark ho gaya."
+                  : action === "reopen"
+                    ? "Project dobara active ho gaya."
+                    : "Project successfully archive ho gaya."
         );
       } catch (error) {
         console.error(
-          "Project archive failed:",
+          "Project lifecycle action failed:",
           error
         );
 
         setErrorMessage(
-          getErrorMessage(
-            error
-          )
+          getErrorMessage(error)
         );
       } finally {
-        setActionLoading(
-          null
-        );
+        setActionLoading(null);
       }
     };
 
@@ -1522,23 +1638,82 @@ export default function ProjectDetailsPage() {
                   Edit Project
                 </Link>
 
+                {project.status === "draft" ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleLifecycleAction("start")}
+                    disabled={actionLoading !== null}
+                    className="inline-flex min-h-11 items-center justify-center rounded-xl border border-emerald-200 px-4 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-60 dark:border-emerald-500/20 dark:text-emerald-400"
+                  >
+                    {actionLoading === "start" ? "Starting..." : "Start Project"}
+                  </button>
+                ) : null}
+
+                {project.status === "active" ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => void handleLifecycleAction("hold")}
+                      disabled={actionLoading !== null}
+                      className="inline-flex min-h-11 items-center justify-center rounded-xl border border-orange-200 px-4 text-sm font-semibold text-orange-700 transition hover:bg-orange-50 disabled:opacity-60 dark:border-orange-500/20 dark:text-orange-400"
+                    >
+                      {actionLoading === "hold" ? "Updating..." : "Put On Hold"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => void handleLifecycleAction("complete")}
+                      disabled={actionLoading !== null}
+                      className="inline-flex min-h-11 items-center justify-center rounded-xl border border-blue-200 px-4 text-sm font-semibold text-blue-700 transition hover:bg-blue-50 disabled:opacity-60 dark:border-blue-500/20 dark:text-blue-400"
+                    >
+                      {actionLoading === "complete" ? "Completing..." : "Mark Completed"}
+                    </button>
+                  </>
+                ) : null}
+
+                {project.status === "on_hold" ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => void handleLifecycleAction("resume")}
+                      disabled={actionLoading !== null}
+                      className="inline-flex min-h-11 items-center justify-center rounded-xl border border-emerald-200 px-4 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-60 dark:border-emerald-500/20 dark:text-emerald-400"
+                    >
+                      {actionLoading === "resume" ? "Resuming..." : "Resume Project"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => void handleLifecycleAction("complete")}
+                      disabled={actionLoading !== null}
+                      className="inline-flex min-h-11 items-center justify-center rounded-xl border border-blue-200 px-4 text-sm font-semibold text-blue-700 transition hover:bg-blue-50 disabled:opacity-60 dark:border-blue-500/20 dark:text-blue-400"
+                    >
+                      {actionLoading === "complete" ? "Completing..." : "Mark Completed"}
+                    </button>
+                  </>
+                ) : null}
+              </>
+            ) : null}
+
+            {project.status === "completed" ? (
+              <>
                 <button
                   type="button"
-                  onClick={
-                    handleArchive
-                  }
-                  disabled={
-                    actionLoading !==
-                    null
-                  }
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-red-200 px-4 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-500/20 dark:text-red-400 dark:hover:bg-red-500/10"
+                  onClick={() => void handleLifecycleAction("reopen")}
+                  disabled={actionLoading !== null}
+                  className="inline-flex min-h-11 items-center justify-center rounded-xl border border-violet-200 px-4 text-sm font-semibold text-violet-700 transition hover:bg-violet-50 disabled:opacity-60 dark:border-violet-500/20 dark:text-violet-400"
+                >
+                  {actionLoading === "reopen" ? "Reopening..." : "Reopen Project"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => void handleLifecycleAction("archive")}
+                  disabled={actionLoading !== null}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-red-200 px-4 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-60 dark:border-red-500/20 dark:text-red-400"
                 >
                   <ArchiveIcon />
-
-                  {actionLoading ===
-                  "archive"
-                    ? "Archiving..."
-                    : "Archive"}
+                  {actionLoading === "archive" ? "Archiving..." : "Archive"}
                 </button>
               </>
             ) : null}
@@ -1634,7 +1809,7 @@ export default function ProjectDetailsPage() {
       </section>
 
       {/* ===================================================
-          RISK SUMMARY
+          TASK SUMMARY
           =================================================== */}
 
       <section>
@@ -1644,27 +1819,24 @@ export default function ProjectDetailsPage() {
           </h2>
 
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Project findings aur supporting
-            evidence ka current summary.
+            Project Tasks aur supporting Evidence ka current summary.
           </p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
           <SummaryCard
-            label="Risk Groups"
+            label="Total Tasks"
             value={
-              project.riskSummary
-                .totalRiskGroups
+              totalRiskGroups
             }
-            description="Total tracker findings."
+            description="Total Task Register records."
             tone="gray"
           />
 
           <SummaryCard
             label="Evidence"
             value={
-              project.riskSummary
-                .totalEvidence
+              totalEvidence
             }
             description="Before and after evidence."
             tone="blue"
@@ -1676,7 +1848,7 @@ export default function ProjectDetailsPage() {
               project.riskSummary
                 .extreme
             }
-            description="Immediate critical action."
+            description="Legacy project risk profile."
             tone="red"
           />
 
@@ -1685,7 +1857,7 @@ export default function ProjectDetailsPage() {
             value={
               project.riskSummary.high
             }
-            description="Urgent corrective action."
+            description="Legacy project risk profile."
             tone="orange"
           />
 
@@ -1695,7 +1867,7 @@ export default function ProjectDetailsPage() {
               project.riskSummary
                 .medium
             }
-            description="Planned corrective action."
+            description="Legacy project risk profile."
             tone="amber"
           />
 
@@ -1704,7 +1876,7 @@ export default function ProjectDetailsPage() {
             value={
               project.riskSummary.low
             }
-            description="Routine monitoring."
+            description="Legacy project risk profile."
             tone="emerald"
           />
         </div>
@@ -1958,6 +2130,25 @@ export default function ProjectDetailsPage() {
                   )
                 }
               />
+
+              <InfoRow
+                label="Schedule Status"
+                value={
+                  formatScheduleStatus(
+                    project.scheduleStatus
+                  )
+                }
+              />
+
+              <InfoRow
+                label="Days Overdue"
+                value={
+                  project.daysOverdue > 0
+                    ? `${project.daysOverdue} day${project.daysOverdue === 1 ? "" : "s"}`
+                    : "0"
+                }
+              />
+
             </div>
           </div>
 
@@ -1968,10 +2159,22 @@ export default function ProjectDetailsPage() {
 
             <div className="px-5 py-2">
               <InfoRow
-                label="Risk Register ID"
+                label="Task Register ID"
                 value={
-                  project.settings
-                    .riskRegisterIdEnabled
+                  (
+                    (
+                      project.settings as {
+                        taskRegisterIdEnabled?: boolean;
+                        riskRegisterIdEnabled?: boolean;
+                      }
+                    ).taskRegisterIdEnabled ??
+                    (
+                      project.settings as {
+                        taskRegisterIdEnabled?: boolean;
+                        riskRegisterIdEnabled?: boolean;
+                      }
+                    ).riskRegisterIdEnabled
+                  )
                     ? "Enabled"
                     : "Disabled"
                 }
@@ -1990,15 +2193,14 @@ export default function ProjectDetailsPage() {
 
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
             <CardHeader
-              title="Tracker Status"
+              title="Task Status"
             />
 
             <div className="space-y-5 p-5">
               <StatusProgress
-                label="Open"
+                label="Open / Legacy"
                 value={
-                  project.riskSummary
-                    .open
+                  openRisks
                 }
                 total={
                   totalRiskGroups
@@ -2009,8 +2211,7 @@ export default function ProjectDetailsPage() {
               <StatusProgress
                 label="In Progress"
                 value={
-                  project.riskSummary
-                    .inProgress
+                  inProgressRisks
                 }
                 total={
                   totalRiskGroups
@@ -2019,10 +2220,9 @@ export default function ProjectDetailsPage() {
               />
 
               <StatusProgress
-                label="Awaiting Verification"
+                label="Awaiting Verification / Legacy"
                 value={
-                  project.riskSummary
-                    .awaitingVerification
+                  awaitingVerificationRisks
                 }
                 total={
                   totalRiskGroups
@@ -2031,10 +2231,9 @@ export default function ProjectDetailsPage() {
               />
 
               <StatusProgress
-                label="Closed"
+                label="Complete"
                 value={
-                  project.riskSummary
-                    .closed
+                  closedRisks
                 }
                 total={
                   totalRiskGroups
@@ -2051,7 +2250,7 @@ export default function ProjectDetailsPage() {
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
             <CardHeader
               title="Client Access"
-              description="Read-only client project link manage karein. Client ko login ki zarurat nahi."
+              description="Read-only client project link manage karein. Client ko login ya JWT Authorization ki zarurat nahi."
             />
 
             <div className="p-5">
@@ -2114,7 +2313,7 @@ export default function ProjectDetailsPage() {
                   </div>
 
                   <p className="mt-2 text-xs leading-5 text-gray-400">
-                    Yehi complete link client ko WhatsApp ya email par share karein. Client link open karke project ko read-only mode mein dekhega.
+                    Yehi complete link client ko WhatsApp ya email par share karein. Client link token-based read-only access deta hai; login required nahi.
                   </p>
                 </div>
               ) : isClientAccessEnabled ? (
@@ -2195,9 +2394,9 @@ export default function ProjectDetailsPage() {
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <ModuleCard
-            title="Risk Register"
-            description="Findings, descriptions, remarks aur status manage karein."
-            to={`/risks?projectId=${project._id}`}
+            title="Task Register"
+            description="Project Task Register, descriptions, Evidence aur status manage karein."
+            to={`/tasks?projectId=${project._id}`}
           />
 
           <ModuleCard
@@ -2220,8 +2419,8 @@ export default function ProjectDetailsPage() {
 
           <ModuleCard
             title="Documents"
-            description="PDF, Word aur Excel progress reports generate hongi."
-            disabled
+            description="PDF, Word aur Excel progress reports generate aur download karein."
+            to={`/documents?projectId=${project._id}`}
           />
         </div>
       </section>

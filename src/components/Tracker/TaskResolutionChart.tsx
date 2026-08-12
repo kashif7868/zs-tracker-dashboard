@@ -14,15 +14,15 @@ import flatpickr from "flatpickr";
 import { CalenderIcon } from "../../icons";
 
 import {
-  getRisks,
-  type Risk,
-} from "../../services/risk/risk.service";
+  getTasks,
+  type Task,
+} from "../../services/task_register/task.service";
 
 /* =========================================================
    TYPES
    ========================================================= */
 
-type WeeklyRiskRecord = {
+type WeeklyTaskRecord = {
   weekStart: Date;
   weekEnd: Date;
 
@@ -164,7 +164,7 @@ const formatSelectedRange = (
   )}`;
 };
 
-const parseRiskDate = (
+const parseTaskDate = (
   value?: string
 ): Date | null => {
   if (!value) {
@@ -217,7 +217,7 @@ const getErrorMessage = (
         ?.errors?.[0]?.msg ||
       requestError.response?.data
         ?.message ||
-      "Risk Resolution data could not be loaded."
+      "Task resolution data could not be loaded."
     );
   }
 
@@ -225,25 +225,25 @@ const getErrorMessage = (
     return error.message;
   }
 
-  return "Risk Resolution data could not be loaded.";
+  return "Task resolution data could not be loaded.";
 };
 
 /* =========================================================
-   FETCH ALL RISK PAGES
+   FETCH ALL TASK PAGES
    ========================================================= */
 
-const fetchAllRisks =
-  async (): Promise<Risk[]> => {
+const fetchAllTasks =
+  async (): Promise<Task[]> => {
     const firstPage =
-      await getRisks({
+      await getTasks({
         page: 1,
         limit: 100,
         sortBy: "createdAt",
         sortOrder: "asc",
       });
 
-    const allRisks = [
-      ...firstPage.risks,
+    const allTasks = [
+      ...firstPage.tasks,
     ];
 
     const totalPages =
@@ -251,7 +251,7 @@ const fetchAllRisks =
         .totalPages;
 
     if (totalPages <= 1) {
-      return allRisks;
+      return allTasks;
     }
 
     const pageRequests =
@@ -261,7 +261,7 @@ const fetchAllRisks =
             totalPages - 1,
         },
         (_, index) =>
-          getRisks({
+          getTasks({
             page: index + 2,
 
             limit:
@@ -281,35 +281,35 @@ const fetchAllRisks =
 
     remainingPages.forEach(
       (result) => {
-        allRisks.push(
-          ...result.risks
+        allTasks.push(
+          ...result.tasks
         );
       }
     );
 
-    return allRisks;
+    return allTasks;
   };
 
 /* =========================================================
-   BUILD WEEKLY DATA
+   BUILD WEEKLY TASK DATA
 
    Weekly comparison:
 
    Registered:
-   Week mein create hone wale total Risks.
+   Week mein create hone wale total Tasks.
 
    Complete:
-   Usi week mein create hone wale Risks jo ab Complete hain.
+   Usi week mein create hone wale Tasks jo ab Complete hain.
 
    In Progress:
-   Usi week mein create hone wale Risks jo ab In Progress hain.
+   Usi week mein create hone wale Tasks jo ab In Progress hain.
    ========================================================= */
 
-const buildWeeklyRiskData = (
-  risks: Risk[],
+const buildWeeklyTaskData = (
+  tasks: Task[],
   selectedStartDate: Date,
   selectedEndDate: Date
-): WeeklyRiskRecord[] => {
+): WeeklyTaskRecord[] => {
   const rangeStart =
     getStartOfWeek(
       selectedStartDate
@@ -320,7 +320,7 @@ const buildWeeklyRiskData = (
       selectedEndDate
     );
 
-  const records: WeeklyRiskRecord[] =
+  const records: WeeklyTaskRecord[] =
     [];
 
   const currentWeek =
@@ -339,11 +339,11 @@ const buildWeeklyRiskData = (
         weekStart
       );
 
-    const weeklyRisks =
-      risks.filter((risk) => {
+    const weeklyTasks =
+      tasks.filter((task) => {
         const createdAt =
-          parseRiskDate(
-            risk.createdAt
+          parseTaskDate(
+            task.createdAt
           );
 
         if (!createdAt) {
@@ -358,16 +358,16 @@ const buildWeeklyRiskData = (
       });
 
     const complete =
-      weeklyRisks.filter(
-        (risk) =>
-          risk.status ===
+      weeklyTasks.filter(
+        (task) =>
+          task.status ===
           "complete"
       ).length;
 
     const inProgress =
-      weeklyRisks.filter(
-        (risk) =>
-          risk.status ===
+      weeklyTasks.filter(
+        (task) =>
+          task.status ===
           "in_progress"
       ).length;
 
@@ -376,7 +376,7 @@ const buildWeeklyRiskData = (
       weekEnd,
 
       registered:
-        weeklyRisks.length,
+        weeklyTasks.length,
 
       complete,
       inProgress,
@@ -428,7 +428,7 @@ function LoadingChart() {
    COMPONENT
    ========================================================= */
 
-export default function RiskResolutionChart() {
+export default function TaskResolutionChart() {
   const datePickerRef =
     useRef<HTMLInputElement>(
       null
@@ -441,8 +441,8 @@ export default function RiskResolutionChart() {
       []
     );
 
-  const [risks, setRisks] =
-    useState<Risk[]>([]);
+  const [tasks, setTasks] =
+    useState<Task[]>([]);
 
   const [
     selectedStartDate,
@@ -468,10 +468,10 @@ export default function RiskResolutionChart() {
     useState("");
 
   /* =======================================================
-     LOAD RISKS
+     LOAD TASKS
      ======================================================= */
 
-  const loadRisks =
+  const loadTasks =
     useCallback(
       async (
         showRefreshLoader = false
@@ -486,11 +486,11 @@ export default function RiskResolutionChart() {
           setError("");
 
           const result =
-            await fetchAllRisks();
+            await fetchAllTasks();
 
-          setRisks(result);
+          setTasks(result);
         } catch (requestError) {
-          setRisks([]);
+          setTasks([]);
 
           setError(
             getErrorMessage(
@@ -506,19 +506,19 @@ export default function RiskResolutionChart() {
     );
 
   useEffect(() => {
-    void loadRisks();
-  }, [loadRisks]);
+    void loadTasks();
+  }, [loadTasks]);
 
   /* =======================================================
-     AVAILABLE DATE LIMITS
+     AVAILABLE TASK DATE LIMITS
      ======================================================= */
 
-  const earliestRiskDate =
+  const earliestTaskDate =
     useMemo(() => {
-      const validDates = risks
-        .map((risk) =>
-          parseRiskDate(
-            risk.createdAt
+      const validDates = tasks
+        .map((task) =>
+          parseTaskDate(
+            task.createdAt
           )
         )
         .filter(
@@ -543,7 +543,7 @@ export default function RiskResolutionChart() {
         : defaultDateRange
             .startDate;
     }, [
-      risks,
+      tasks,
       defaultDateRange,
     ]);
 
@@ -585,7 +585,7 @@ export default function RiskResolutionChart() {
           ],
 
           minDate:
-            earliestRiskDate,
+            earliestTaskDate,
 
           maxDate:
             latestAllowedDate,
@@ -651,7 +651,7 @@ export default function RiskResolutionChart() {
       }
     };
   }, [
-    earliestRiskDate,
+    earliestTaskDate,
     latestAllowedDate,
   ]);
 
@@ -662,23 +662,23 @@ export default function RiskResolutionChart() {
   const weeklyData =
     useMemo(
       () =>
-        buildWeeklyRiskData(
-          risks,
+        buildWeeklyTaskData(
+          tasks,
           selectedStartDate,
           selectedEndDate
         ),
       [
-        risks,
+        tasks,
         selectedStartDate,
         selectedEndDate,
       ]
     );
 
   /* =======================================================
-     FILTERED RANGE RISKS
+     FILTERED RANGE TASKS
      ======================================================= */
 
-  const selectedRangeRisks =
+  const selectedRangeTasks =
     useMemo(() => {
       const rangeStart =
         normalizeStartOfDay(
@@ -690,11 +690,11 @@ export default function RiskResolutionChart() {
           selectedEndDate
         );
 
-      return risks.filter(
-        (risk) => {
+      return tasks.filter(
+        (task) => {
           const createdAt =
-            parseRiskDate(
-              risk.createdAt
+            parseTaskDate(
+              task.createdAt
             );
 
           if (!createdAt) {
@@ -709,7 +709,7 @@ export default function RiskResolutionChart() {
         }
       );
     }, [
-      risks,
+      tasks,
       selectedStartDate,
       selectedEndDate,
     ]);
@@ -719,19 +719,19 @@ export default function RiskResolutionChart() {
      ======================================================= */
 
   const totalRegistered =
-    selectedRangeRisks.length;
+    selectedRangeTasks.length;
 
   const totalCompleted =
-    selectedRangeRisks.filter(
-      (risk) =>
-        risk.status ===
+    selectedRangeTasks.filter(
+      (task) =>
+        task.status ===
         "complete"
     ).length;
 
   const totalInProgress =
-    selectedRangeRisks.filter(
-      (risk) =>
-        risk.status ===
+    selectedRangeTasks.filter(
+      (task) =>
+        task.status ===
         "in_progress"
     ).length;
 
@@ -755,7 +755,7 @@ export default function RiskResolutionChart() {
     () => [
       {
         name:
-          "Risks Registered",
+          "Tasks Registered",
 
         data: weeklyData.map(
           (record) =>
@@ -765,7 +765,7 @@ export default function RiskResolutionChart() {
 
       {
         name:
-          "Risks Complete",
+          "Tasks Complete",
 
         data: weeklyData.map(
           (record) =>
@@ -775,7 +775,7 @@ export default function RiskResolutionChart() {
 
       {
         name:
-          "Risks In Progress",
+          "Tasks In Progress",
 
         data: weeklyData.map(
           (record) =>
@@ -920,7 +920,7 @@ export default function RiskResolutionChart() {
             ) =>
               `${Math.round(
                 value
-              )} Risk record${
+              )} Task record${
                 value === 1
                   ? ""
                   : "s"
@@ -988,7 +988,7 @@ export default function RiskResolutionChart() {
 
         noData: {
           text:
-            "No Risk records available",
+            "No Task records available",
 
           align: "center",
 
@@ -1028,8 +1028,7 @@ export default function RiskResolutionChart() {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-              Risk Resolution
-              Statistics
+              Task Resolution Statistics
             </h3>
 
             <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
@@ -1039,15 +1038,14 @@ export default function RiskResolutionChart() {
 
           <p className="mt-1 text-theme-sm leading-6 text-gray-500 dark:text-gray-400">
             Date range ke mutabiq
-            registered, In Progress aur
-            Complete Risks compare karein.
+            registered, In Progress aur Complete Tasks compare karein.
           </p>
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="min-w-0">
             <label
-              htmlFor="risk-statistics-range"
+              htmlFor="task-resolution-range"
               className="mb-2 block text-xs font-bold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400"
             >
               Select Date Range
@@ -1057,7 +1055,7 @@ export default function RiskResolutionChart() {
               <CalenderIcon className="pointer-events-none absolute left-3 top-1/2 z-10 size-5 -translate-y-1/2 text-gray-500 dark:text-gray-400" />
 
               <input
-                id="risk-statistics-range"
+                id="task-resolution-range"
                 ref={datePickerRef}
                 type="text"
                 readOnly
@@ -1078,7 +1076,7 @@ export default function RiskResolutionChart() {
             type="button"
             disabled={refreshing}
             onClick={() => {
-              void loadRisks(true);
+              void loadTasks(true);
             }}
             className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]"
           >
@@ -1127,7 +1125,7 @@ export default function RiskResolutionChart() {
           <button
             type="button"
             onClick={() => {
-              void loadRisks();
+              void loadTasks();
             }}
             className="inline-flex h-9 items-center justify-center rounded-lg border border-red-200 bg-white px-4 text-xs font-bold text-red-700 transition hover:bg-red-100 dark:border-red-900 dark:bg-gray-900 dark:text-red-400"
           >
@@ -1179,7 +1177,7 @@ export default function RiskResolutionChart() {
           </div>
 
           <p className="mt-4 text-sm font-bold text-gray-800 dark:text-gray-200">
-            No Risk records in this range
+            No Task records in this range
           </p>
 
           <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
@@ -1191,7 +1189,7 @@ export default function RiskResolutionChart() {
         <div className="max-w-full overflow-x-auto custom-scrollbar">
           <div className="min-w-[760px] xl:min-w-full">
             <Chart
-              key={`${selectedStartDate.toISOString()}-${selectedEndDate.toISOString()}-${risks.length}`}
+              key={`${selectedStartDate.toISOString()}-${selectedEndDate.toISOString()}-${tasks.length}`}
               options={options}
               series={series}
               type="area"

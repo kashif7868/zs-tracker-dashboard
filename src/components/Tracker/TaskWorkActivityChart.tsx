@@ -5,35 +5,50 @@ import {
   useState,
 } from "react";
 
-import { useNavigate } from "react-router";
-
-import { MoreDotIcon } from "../../icons";
-
-import { Dropdown } from "../ui/dropdown/Dropdown";
-import { DropdownItem } from "../ui/dropdown/DropdownItem";
+import {
+  useNavigate,
+} from "react-router";
 
 import {
-  buildRiskDashboardSummary,
-  getRisks,
-  type Risk,
-} from "../../services/risk/risk.service";
+  MoreDotIcon,
+} from "../../icons";
+
+import {
+  Dropdown,
+} from "../ui/dropdown/Dropdown";
+
+import {
+  DropdownItem,
+} from "../ui/dropdown/DropdownItem";
+
+import {
+  buildTaskDashboardSummary,
+  getTasks,
+  type Task,
+} from "../../services/task_register/task.service";
 
 /* =========================================================
    TYPES
    ========================================================= */
 
 type WorkflowMetrics = {
-  totalRisks: number;
+  totalTasks: number;
+
   complete: number;
+
   readyToComplete: number;
+
   beforeOnly: number;
+
   afterOnly: number;
+
   noEvidence: number;
 };
 
 type WorkflowItem = {
   name: string;
   description: string;
+
   count: number;
   percentage: number;
 
@@ -47,11 +62,16 @@ type WorkflowItem = {
    ========================================================= */
 
 const EMPTY_METRICS: WorkflowMetrics = {
-  totalRisks: 0,
+  totalTasks: 0,
+
   complete: 0,
+
   readyToComplete: 0,
+
   beforeOnly: 0,
+
   afterOnly: 0,
+
   noEvidence: 0,
 };
 
@@ -90,7 +110,7 @@ const getErrorMessage = (
         ?.msg ||
       requestError.response
         ?.data?.message ||
-      "Risk workflow data could not be loaded."
+      "Task workflow data could not be loaded."
     );
   }
 
@@ -100,46 +120,59 @@ const getErrorMessage = (
     return error.message;
   }
 
-  return "Risk workflow data could not be loaded.";
+  return "Task workflow data could not be loaded.";
 };
 
 const calculatePercentage = (
   count: number,
   total: number
 ): number => {
-  if (total <= 0) {
+  if (
+    total <= 0
+  ) {
     return 0;
   }
 
   return Math.round(
-    (count / total) * 100
+    (
+      count /
+      total
+    ) *
+      100
   );
 };
 
 /* =========================================================
-   FETCH ALL RISKS
+   FETCH ALL TASKS
    ========================================================= */
 
-const fetchAllRisks =
-  async (): Promise<Risk[]> => {
+const fetchAllTasks =
+  async (): Promise<Task[]> => {
     const firstPage =
-      await getRisks({
+      await getTasks({
         page: 1,
+
         limit: 100,
-        sortBy: "createdAt",
-        sortOrder: "desc",
+
+        sortBy:
+          "createdAt",
+
+        sortOrder:
+          "desc",
       });
 
-    const risks = [
-      ...firstPage.risks,
+    const tasks = [
+      ...firstPage.tasks,
     ];
 
     const totalPages =
       firstPage.pagination
         .totalPages;
 
-    if (totalPages <= 1) {
-      return risks;
+    if (
+      totalPages <= 1
+    ) {
+      return tasks;
     }
 
     const remainingRequests =
@@ -148,8 +181,12 @@ const fetchAllRisks =
           length:
             totalPages - 1,
         },
-        (_, index) =>
-          getRisks({
+
+        (
+          _,
+          index
+        ) =>
+          getTasks({
             page:
               index + 2,
 
@@ -171,14 +208,16 @@ const fetchAllRisks =
       );
 
     remainingPages.forEach(
-      (result) => {
-        risks.push(
-          ...result.risks
+      (
+        result
+      ) => {
+        tasks.push(
+          ...result.tasks
         );
       }
     );
 
-    return risks;
+    return tasks;
   };
 
 /* =========================================================
@@ -186,23 +225,25 @@ const fetchAllRisks =
    ========================================================= */
 
 const buildWorkflowMetrics = (
-  risks: Risk[]
+  tasks: Task[]
 ): WorkflowMetrics => {
-  return risks.reduce(
+  return tasks.reduce(
     (
       metrics,
-      risk
+      task
     ) => {
-      metrics.totalRisks +=
+      metrics.totalTasks +=
         1;
 
       const beforeCount =
-        risk.evidenceSummary
-          ?.beforeCount ?? 0;
+        task.evidenceSummary
+          ?.beforeCount ??
+        0;
 
       const afterCount =
-        risk.evidenceSummary
-          ?.afterCount ?? 0;
+        task.evidenceSummary
+          ?.afterCount ??
+        0;
 
       const hasBefore =
         beforeCount > 0;
@@ -213,7 +254,7 @@ const buildWorkflowMetrics = (
       /* COMPLETE */
 
       if (
-        risk.status ===
+        task.status ===
         "complete"
       ) {
         metrics.complete +=
@@ -265,6 +306,7 @@ const buildWorkflowMetrics = (
 
       return metrics;
     },
+
     {
       ...EMPTY_METRICS,
     }
@@ -293,9 +335,14 @@ function LoadingCard() {
           {Array.from({
             length: 3,
           }).map(
-            (_, index) => (
+            (
+              _,
+              index
+            ) => (
               <div
-                key={index}
+                key={
+                  index
+                }
                 className="h-20 rounded-xl bg-gray-100 dark:bg-gray-800"
               />
             )
@@ -306,9 +353,14 @@ function LoadingCard() {
           {Array.from({
             length: 5,
           }).map(
-            (_, index) => (
+            (
+              _,
+              index
+            ) => (
               <div
-                key={index}
+                key={
+                  index
+                }
                 className="min-w-0"
               >
                 <div className="flex items-center gap-3">
@@ -335,9 +387,14 @@ function LoadingCard() {
 
 /* =========================================================
    COMPONENT
+
+   File name can temporarily remain RiskCategoryCard.tsx
+   so Home.tsx does not break during migration.
+
+   UI terminology is now Task Workflow Status.
    ========================================================= */
 
-export default function RiskCategoryCard() {
+export default function TaskWorkflowCard() {
   const navigate =
     useNavigate();
 
@@ -348,10 +405,10 @@ export default function RiskCategoryCard() {
     useState(false);
 
   const [
-    risks,
-    setRisks,
+    tasks,
+    setTasks,
   ] =
-    useState<Risk[]>([]);
+    useState<Task[]>([]);
 
   const [
     loading,
@@ -396,15 +453,15 @@ export default function RiskCategoryCard() {
           setError("");
 
           const result =
-            await fetchAllRisks();
+            await fetchAllTasks();
 
-          setRisks(
+          setTasks(
             result
           );
         } catch (
           requestError
         ) {
-          setRisks([]);
+          setTasks([]);
 
           setError(
             getErrorMessage(
@@ -421,6 +478,7 @@ export default function RiskCategoryCard() {
           );
         }
       },
+
       []
     );
 
@@ -437,21 +495,27 @@ export default function RiskCategoryCard() {
   const metrics =
     useMemo(
       () =>
-        risks.length > 0
+        tasks.length > 0
           ? buildWorkflowMetrics(
-              risks
+              tasks
             )
           : EMPTY_METRICS,
-      [risks]
+
+      [
+        tasks,
+      ]
     );
 
   const summary =
     useMemo(
       () =>
-        buildRiskDashboardSummary(
-          risks
+        buildTaskDashboardSummary(
+          tasks
         ),
-      [risks]
+
+      [
+        tasks,
+      ]
     );
 
   /* =======================================================
@@ -466,7 +530,7 @@ export default function RiskCategoryCard() {
             "Complete",
 
           description:
-            "Rectification completed",
+            "Task completed",
 
           count:
             metrics.complete,
@@ -474,7 +538,7 @@ export default function RiskCategoryCard() {
           percentage:
             calculatePercentage(
               metrics.complete,
-              metrics.totalRisks
+              metrics.totalTasks
             ),
 
           barClassName:
@@ -500,7 +564,7 @@ export default function RiskCategoryCard() {
           percentage:
             calculatePercentage(
               metrics.readyToComplete,
-              metrics.totalRisks
+              metrics.totalTasks
             ),
 
           barClassName:
@@ -526,7 +590,7 @@ export default function RiskCategoryCard() {
           percentage:
             calculatePercentage(
               metrics.beforeOnly,
-              metrics.totalRisks
+              metrics.totalTasks
             ),
 
           barClassName:
@@ -552,7 +616,7 @@ export default function RiskCategoryCard() {
           percentage:
             calculatePercentage(
               metrics.afterOnly,
-              metrics.totalRisks
+              metrics.totalTasks
             ),
 
           barClassName:
@@ -578,7 +642,7 @@ export default function RiskCategoryCard() {
           percentage:
             calculatePercentage(
               metrics.noEvidence,
-              metrics.totalRisks
+              metrics.totalTasks
             ),
 
           barClassName:
@@ -591,7 +655,10 @@ export default function RiskCategoryCard() {
             "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
         },
       ],
-      [metrics]
+
+      [
+        metrics,
+      ]
     );
 
   /* =======================================================
@@ -601,31 +668,35 @@ export default function RiskCategoryCard() {
   const toggleDropdown =
     () => {
       setIsOpen(
-        (current) =>
+        (
+          current
+        ) =>
           !current
       );
     };
 
   const closeDropdown =
     () => {
-      setIsOpen(false);
-    };
-
-  const openRiskRegister =
-    () => {
-      closeDropdown();
-
-      navigate(
-        "/risks"
+      setIsOpen(
+        false
       );
     };
 
-  const createRisk =
+  const openTaskRegister =
     () => {
       closeDropdown();
 
       navigate(
-        "/risks/create"
+        "/tasks"
+      );
+    };
+
+  const createTask =
+    () => {
+      closeDropdown();
+
+      navigate(
+        "/tasks/create"
       );
     };
 
@@ -642,7 +713,9 @@ export default function RiskCategoryCard() {
      LOADING
      ======================================================= */
 
-  if (loading) {
+  if (
+    loading
+  ) {
     return (
       <LoadingCard />
     );
@@ -654,16 +727,14 @@ export default function RiskCategoryCard() {
 
   return (
     <section className="flex h-full w-full min-w-0 max-w-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
-      {/* ===================================================
-          HEADER
-          =================================================== */}
+      {/* HEADER */}
 
       <div className="border-b border-gray-100 px-5 py-5 dark:border-gray-800 sm:px-6">
         <div className="flex min-w-0 items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-                Risk Workflow Status
+                Task Workflow Status
               </h3>
 
               <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
@@ -674,7 +745,7 @@ export default function RiskCategoryCard() {
             </div>
 
             <p className="mt-1.5 text-sm leading-5 text-gray-500 dark:text-gray-400">
-              Evidence readiness and rectification workflow.
+              Evidence readiness and Task completion workflow.
             </p>
           </div>
 
@@ -690,7 +761,7 @@ export default function RiskCategoryCard() {
                 toggleDropdown
               }
               className="dropdown-toggle flex size-9 items-center justify-center rounded-lg transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-white/5"
-              aria-label="Open Risk workflow options"
+              aria-label="Open Task workflow options"
               aria-expanded={
                 isOpen
               }
@@ -709,20 +780,20 @@ export default function RiskCategoryCard() {
             >
               <DropdownItem
                 onItemClick={
-                  openRiskRegister
+                  openTaskRegister
                 }
                 className="flex w-full rounded-lg text-left font-normal text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
               >
-                View Risk Register
+                View Task Register
               </DropdownItem>
 
               <DropdownItem
                 onItemClick={
-                  createRisk
+                  createTask
                 }
                 className="flex w-full rounded-lg text-left font-normal text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
               >
-                Create Risk
+                Create Task
               </DropdownItem>
 
               <DropdownItem
@@ -765,13 +836,9 @@ export default function RiskCategoryCard() {
         ) : null}
       </div>
 
-      {/* ===================================================
-          SUMMARY
-          =================================================== */}
+      {/* SUMMARY */}
 
       <div className="grid min-w-0 grid-cols-3 border-b border-gray-100 bg-gray-50/50 dark:border-gray-800 dark:bg-gray-950/20">
-        {/* TOTAL */}
-
         <div className="min-w-0 px-3 py-4 text-center sm:px-4">
           <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-gray-400">
             Total
@@ -779,12 +846,10 @@ export default function RiskCategoryCard() {
 
           <p className="mt-1 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
             {
-              metrics.totalRisks
+              metrics.totalTasks
             }
           </p>
         </div>
-
-        {/* ACTIVE */}
 
         <div className="min-w-0 border-x border-gray-100 px-3 py-4 text-center dark:border-gray-800 sm:px-4">
           <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
@@ -793,12 +858,10 @@ export default function RiskCategoryCard() {
 
           <p className="mt-1 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
             {
-              summary.inProgressRisks
+              summary.inProgressTasks
             }
           </p>
         </div>
-
-        {/* COMPLETE */}
 
         <div className="min-w-0 px-3 py-4 text-center sm:px-4">
           <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
@@ -807,18 +870,16 @@ export default function RiskCategoryCard() {
 
           <p className="mt-1 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
             {
-              summary.completeRisks
+              summary.completeTasks
             }
           </p>
         </div>
       </div>
 
-      {/* ===================================================
-          WORKFLOW CONTENT
-          =================================================== */}
+      {/* WORKFLOW CONTENT */}
 
       <div className="flex-1 p-5 sm:p-6">
-        {metrics.totalRisks ===
+        {metrics.totalTasks ===
         0 ? (
           <div className="flex min-h-[290px] flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50 px-5 text-center dark:border-gray-800 dark:bg-gray-900/40">
             <div className="flex size-14 items-center justify-center rounded-2xl bg-gray-100 text-xl font-bold text-gray-400 dark:bg-gray-800">
@@ -826,21 +887,21 @@ export default function RiskCategoryCard() {
             </div>
 
             <p className="mt-4 text-sm font-semibold text-gray-800 dark:text-gray-200">
-              No Risk records available
+              No Task records available
             </p>
 
             <p className="mt-1.5 max-w-xs text-xs leading-5 text-gray-500 dark:text-gray-400">
-              Workflow details will appear when Risk records are created.
+              Workflow details will appear when Task records are created.
             </p>
 
             <button
               type="button"
               onClick={
-                createRisk
+                createTask
               }
               className="mt-4 inline-flex h-9 items-center justify-center rounded-lg bg-emerald-600 px-4 text-xs font-bold text-white transition hover:bg-emerald-700"
             >
-              Create Risk
+              Create Task
             </button>
           </div>
         ) : (
@@ -855,16 +916,10 @@ export default function RiskCategoryCard() {
                   }
                   className="w-full min-w-0 max-w-full"
                 >
-                  {/* ROW */}
-
                   <div className="flex min-w-0 items-center gap-3">
-                    {/* DOT */}
-
                     <span
                       className={`size-2.5 shrink-0 rounded-full ${item.dotClassName}`}
                     />
-
-                    {/* TEXT */}
 
                     <div className="min-w-0 flex-1">
                       <div className="flex min-w-0 items-center justify-between gap-3">
@@ -896,8 +951,6 @@ export default function RiskCategoryCard() {
                     </div>
                   </div>
 
-                  {/* PROGRESS BAR */}
-
                   <div className="ml-[22px] mt-2.5 h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
                     <div
                       className={`h-full rounded-full transition-all duration-700 ${item.barClassName}`}
@@ -914,9 +967,7 @@ export default function RiskCategoryCard() {
         )}
       </div>
 
-      {/* ===================================================
-          FOOTER
-          =================================================== */}
+      {/* FOOTER */}
 
       <div className="border-t border-gray-100 bg-gray-50/40 px-5 py-3.5 dark:border-gray-800 dark:bg-gray-950/20 sm:px-6">
         <p className="text-[11px] leading-5 text-gray-500 dark:text-gray-400">

@@ -19,7 +19,6 @@ import {
   createProject,
   type CreateProjectPayload,
   type OverallRiskLevel,
-  type ProjectStatus,
   type ProjectType,
 } from "../../services/project/project.service";
 
@@ -49,7 +48,6 @@ type ProjectFormData = {
   startDate: string;
   expectedCompletionDate: string;
 
-  status: ProjectStatus;
   overallRiskLevel: OverallRiskLevel;
 
   riskRegisterIdEnabled: boolean;
@@ -92,8 +90,6 @@ const initialFormData: ProjectFormData = {
   startDate: "",
   expectedCompletionDate: "",
 
-  status: "draft",
-
   overallRiskLevel:
     "high_to_critical",
 
@@ -119,7 +115,7 @@ const projectTypeOptions: Array<{
       "risk_rectification",
 
     label:
-      "Risk Rectification",
+      "Task / Rectification Project",
   },
 
   {
@@ -157,39 +153,6 @@ const projectTypeOptions: Array<{
   {
     value: "other",
     label: "Other",
-  },
-];
-
-const statusOptions: Array<{
-  value: ProjectStatus;
-  label: string;
-}> = [
-  {
-    value: "draft",
-    label: "Draft",
-  },
-
-  {
-    value: "active",
-    label: "Active",
-  },
-
-  {
-    value: "on_hold",
-    label: "On Hold",
-  },
-
-  {
-    value:
-      "awaiting_verification",
-
-    label:
-      "Awaiting Verification",
-  },
-
-  {
-    value: "completed",
-    label: "Completed",
   },
 ];
 
@@ -689,9 +652,6 @@ export default function CreateProjectPage() {
             formData
               .projectType,
 
-          status:
-            formData.status,
-
           overallRiskLevel:
             formData
               .overallRiskLevel,
@@ -935,7 +895,7 @@ export default function CreateProjectPage() {
       <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
         <SectionHeader
           title="Project Information"
-          description="Project ki identification, type, current status aur scope."
+          description="Project ki identification, type aur scope. Naya project hamesha Draft state mein create hoga."
         />
 
         <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-2">
@@ -984,6 +944,18 @@ export default function CreateProjectPage() {
             </div>
           </div>
 
+          <div className="lg:col-span-2">
+            <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 dark:border-violet-500/20 dark:bg-violet-500/10">
+              <p className="text-sm font-semibold text-violet-700 dark:text-violet-300">
+                Project lifecycle
+              </p>
+
+              <p className="mt-1 text-xs leading-5 text-violet-700/80 dark:text-violet-300/80">
+                Naya project Draft state mein create hoga. Project Details page se Start Project, Put On Hold, Resume, Mark Completed aur Archive actions control hongi. Expected completion date sirf deadline hai; project automatically complete nahi hoga.
+              </p>
+            </div>
+          </div>
+
           <div>
             <label
               htmlFor="projectType"
@@ -1005,42 +977,6 @@ export default function CreateProjectPage() {
               className="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none transition focus:border-emerald-400 focus:ring-3 focus:ring-emerald-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
             >
               {projectTypeOptions.map(
-                (option) => (
-                  <option
-                    key={
-                      option.value
-                    }
-                    value={
-                      option.value
-                    }
-                  >
-                    {option.label}
-                  </option>
-                )
-              )}
-            </select>
-          </div>
-
-          <div>
-            <label
-              htmlFor="status"
-              className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
-            >
-              Project Status
-            </label>
-
-            <select
-              id="status"
-              name="status"
-              value={
-                formData.status
-              }
-              onChange={
-                handleInputChange
-              }
-              className="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none transition focus:border-emerald-400 focus:ring-3 focus:ring-emerald-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
-            >
-              {statusOptions.map(
                 (option) => (
                   <option
                     key={
@@ -1458,7 +1394,7 @@ export default function CreateProjectPage() {
       <section className="overflow-visible rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
         <SectionHeader
           title="Audit & Project Schedule"
-          description="Audit, execution start aur expected completion date select karein."
+          description="Audit, planned start aur target completion date select karein. In dates se status automatically change nahi hoga."
         />
 
         <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-3">
@@ -1524,20 +1460,20 @@ export default function CreateProjectPage() {
       <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
         <SectionHeader
           title="Project Settings"
-          description="Risk Register aur client access ki project-level settings."
+          description="Task Register aur client access ki project-level settings."
         />
 
         <div className="space-y-4 p-5 sm:p-6">
           <label className="flex cursor-pointer items-start justify-between gap-5 rounded-xl border border-gray-200 p-4 dark:border-gray-800">
             <div className="min-w-0">
               <span className="block text-sm font-semibold text-gray-900 dark:text-white">
-                Enable Risk Register ID
+                Enable Task Register ID
               </span>
 
               <span className="mt-1 block text-xs leading-5 text-gray-500 dark:text-gray-400">
                 Enable hone par
-                Create Risk form mein
-                optional Risk Register
+                Create Task form mein
+                optional Task Register
                 ID field show hogi.
                 Disabled hone par Sr.
                 No. automatically use
@@ -1621,13 +1557,13 @@ export default function CreateProjectPage() {
 
       <section className="rounded-2xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950/30">
         <p className="text-sm font-semibold text-blue-800 dark:text-blue-300">
-          Risk summary aur project
+          Task summary aur project
           progress manually enter nahi
           hongi.
         </p>
 
         <p className="mt-1 text-xs leading-5 text-blue-700 dark:text-blue-400">
-          Total risks, completed work,
+          Total tasks, completed work,
           evidence, action-plan progress
           aur testing progress actual
           tracker records se

@@ -14,14 +14,15 @@ import {
 } from "../../services/project/project.service";
 
 import {
-  getRiskById,
-  getRisksByProject,
-  markRiskComplete,
-  markRiskInProgress,
-  type Risk,
-  type RiskEvidence,
-  type RiskEvidenceSummary,
-} from "../../services/risk/risk.service";
+  getTaskById,
+  getTasksByProject,
+  markTaskComplete,
+  markTaskInProgress,
+  getTaskSerialLabel,
+  type Task,
+  type TaskEvidence,
+  type TaskEvidenceSummary,
+} from "../../services/task_register/task.service";
 
 import {
   ALLOWED_EVIDENCE_IMAGE_TYPES,
@@ -59,7 +60,7 @@ type AlertState = {
    CONSTANTS
    ========================================================= */
 
-const EMPTY_EVIDENCE: RiskEvidenceSummary = {
+const EMPTY_EVIDENCE: TaskEvidenceSummary = {
   before: [],
   after: [],
 
@@ -253,7 +254,7 @@ const getErrorMessage = (
 };
 
 const formatStatus = (
-  status: Risk["status"]
+  status: Task["status"]
 ): string => {
   return status === "complete"
     ? "Complete"
@@ -272,7 +273,7 @@ const formatFileSize = (
 };
 
 const createEmptyEvidence =
-  (): RiskEvidenceSummary => {
+  (): TaskEvidenceSummary => {
     return {
       ...EMPTY_EVIDENCE,
       before: [],
@@ -303,23 +304,23 @@ export default function EvidencePage() {
     setSelectedProjectId,
   ] = useState("");
 
-  const [risks, setRisks] =
-    useState<Risk[]>([]);
+  const [tasks, setTasks] =
+    useState<Task[]>([]);
 
   const [
-    selectedRiskId,
-    setSelectedRiskId,
+    selectedTaskId,
+    setSelectedTaskId,
   ] = useState("");
 
   const [
-    selectedRisk,
-    setSelectedRisk,
-  ] = useState<Risk | null>(
+    selectedTask,
+    setSelectedTask,
+  ] = useState<Task | null>(
     null
   );
 
   const [evidence, setEvidence] =
-    useState<RiskEvidenceSummary>(
+    useState<TaskEvidenceSummary>(
       createEmptyEvidence()
     );
 
@@ -342,8 +343,8 @@ export default function EvidencePage() {
   ] = useState(true);
 
   const [
-    risksLoading,
-    setRisksLoading,
+    tasksLoading,
+    setTasksLoading,
   ] = useState(false);
 
   const [
@@ -425,25 +426,25 @@ export default function EvidencePage() {
     }, []);
 
   /* =======================================================
-     LOAD ALL RISKS FOR SELECTED PROJECT
+     LOAD ALL TASKS FOR SELECTED PROJECT
      ======================================================= */
 
-  const loadProjectRisks =
+  const loadProjectTasks =
     useCallback(
       async (
         projectId: string
       ) => {
         if (!projectId) {
-          setRisks([]);
+          setTasks([]);
           return;
         }
 
         try {
-          setRisksLoading(true);
+          setTasksLoading(true);
           setAlert(null);
 
           const firstPage =
-            await getRisksByProject(
+            await getTasksByProject(
               projectId,
               {
                 page: 1,
@@ -455,8 +456,8 @@ export default function EvidencePage() {
               }
             );
 
-          const allRisks = [
-            ...firstPage.risks,
+          const allTasks = [
+            ...firstPage.tasks,
           ];
 
           const totalPages =
@@ -472,7 +473,7 @@ export default function EvidencePage() {
                     1,
                 },
                 (_, index) =>
-                  getRisksByProject(
+                  getTasksByProject(
                     projectId,
                     {
                       page:
@@ -499,35 +500,35 @@ export default function EvidencePage() {
 
             remainingPages.forEach(
               (result) => {
-                allRisks.push(
-                  ...result.risks
+                allTasks.push(
+                  ...result.tasks
                 );
               }
             );
           }
 
-          setRisks(allRisks);
+          setTasks(allTasks);
 
-          setSelectedRiskId(
-            (currentRiskId) => {
+          setSelectedTaskId(
+            (currentTaskId) => {
               if (
-                currentRiskId &&
-                allRisks.some(
-                  (risk) =>
-                    risk._id ===
-                    currentRiskId
+                currentTaskId &&
+                allTasks.some(
+                  (task) =>
+                    task._id ===
+                    currentTaskId
                 )
               ) {
-                return currentRiskId;
+                return currentTaskId;
               }
 
               return "";
             }
           );
         } catch (error) {
-          setRisks([]);
+          setTasks([]);
 
-          setSelectedRiskId("");
+          setSelectedTaskId("");
 
           setAlert({
             type: "error",
@@ -535,23 +536,23 @@ export default function EvidencePage() {
               getErrorMessage(error),
           });
         } finally {
-          setRisksLoading(false);
+          setTasksLoading(false);
         }
       },
       []
     );
 
   /* =======================================================
-     LOAD SELECTED RISK DETAILS
+     LOAD SELECTED TASK DETAILS
      ======================================================= */
 
-  const loadRiskDetails =
+  const loadTaskDetails =
     useCallback(
       async (
-        riskId: string
+        taskId: string
       ) => {
-        if (!riskId) {
-          setSelectedRisk(null);
+        if (!taskId) {
+          setSelectedTask(null);
 
           setEvidence(
             createEmptyEvidence()
@@ -565,35 +566,35 @@ export default function EvidencePage() {
           setAlert(null);
 
           const result =
-            await getRiskById(
-              riskId
+            await getTaskById(
+              taskId
             );
 
-          setSelectedRisk(
-            result.risk
+          setSelectedTask(
+            result.task
           );
 
           setEvidence(
             result.evidence
           );
 
-          setRisks(
-            (currentRisks) =>
-              currentRisks.map(
-                (risk) =>
-                  risk._id ===
-                  result.risk._id
+          setTasks(
+            (currentTasks) =>
+              currentTasks.map(
+                (task) =>
+                  task._id ===
+                  result.task._id
                     ? {
-                        ...result.risk,
+                        ...result.task,
 
                         evidenceSummary:
                           result.evidence,
                       }
-                    : risk
+                    : task
               )
           );
         } catch (error) {
-          setSelectedRisk(null);
+          setSelectedTask(null);
 
           setEvidence(
             createEmptyEvidence()
@@ -624,9 +625,9 @@ export default function EvidencePage() {
      ======================================================= */
 
   useEffect(() => {
-    setSelectedRiskId("");
+    setSelectedTaskId("");
 
-    setSelectedRisk(null);
+    setSelectedTask(null);
 
     setEvidence(
       createEmptyEvidence()
@@ -650,19 +651,19 @@ export default function EvidencePage() {
     }
 
     if (selectedProjectId) {
-      void loadProjectRisks(
+      void loadProjectTasks(
         selectedProjectId
       );
     } else {
-      setRisks([]);
+      setTasks([]);
     }
   }, [
     selectedProjectId,
-    loadProjectRisks,
+    loadProjectTasks,
   ]);
 
   /* =======================================================
-     RISK CHANGE
+     TASK CHANGE
      ======================================================= */
 
   useEffect(() => {
@@ -683,19 +684,19 @@ export default function EvidencePage() {
         "";
     }
 
-    void loadRiskDetails(
-      selectedRiskId
+    void loadTaskDetails(
+      selectedTaskId
     );
   }, [
-    selectedRiskId,
-    loadRiskDetails,
+    selectedTaskId,
+    loadTaskDetails,
   ]);
 
   /* =======================================================
-     FILTERED RISK LIST
+     FILTERED TASK LIST
      ======================================================= */
 
-  const filteredRisks =
+  const filteredTasks =
     useMemo(() => {
       const normalizedSearch =
         search
@@ -703,18 +704,18 @@ export default function EvidencePage() {
           .toLowerCase();
 
       if (!normalizedSearch) {
-        return risks;
+        return tasks;
       }
 
-      return risks.filter(
-        (risk) => {
+      return tasks.filter(
+        (task) => {
           const searchValue = [
-            risk.serialNo,
-            risk.riskRegisterId,
-            risk.projectCode,
-            risk.description,
+            task.serialNo,
+            task.taskRegisterId,
+            task.projectCode,
+            task.description,
             formatStatus(
-              risk.status
+              task.status
             ),
           ]
             .join(" ")
@@ -725,7 +726,7 @@ export default function EvidencePage() {
           );
         }
       );
-    }, [risks, search]);
+    }, [tasks, search]);
 
   const selectedProject =
     useMemo(() => {
@@ -831,21 +832,21 @@ export default function EvidencePage() {
   };
 
   /* =======================================================
-     REFRESH SELECTED RISK AND LIST
+     REFRESH SELECTED TASK AND LIST
      ======================================================= */
 
   const refreshSelectedData =
     async () => {
-      if (!selectedRiskId) {
+      if (!selectedTaskId) {
         return;
       }
 
-      await loadRiskDetails(
-        selectedRiskId
+      await loadTaskDetails(
+        selectedTaskId
       );
 
       if (selectedProjectId) {
-        await loadProjectRisks(
+        await loadProjectTasks(
           selectedProjectId
         );
       }
@@ -859,11 +860,11 @@ export default function EvidencePage() {
     async (
       evidenceType: EvidenceType
     ) => {
-      if (!selectedRiskId) {
+      if (!selectedTaskId) {
         setAlert({
           type: "error",
           message:
-            "Select a Risk before uploading Evidence.",
+            "Select a Task before uploading Evidence.",
         });
 
         return;
@@ -898,7 +899,7 @@ export default function EvidencePage() {
           "before"
         ) {
           await uploadBeforeEvidence(
-            selectedRiskId,
+            selectedTaskId,
             files
           );
 
@@ -912,7 +913,7 @@ export default function EvidencePage() {
           }
         } else {
           await uploadAfterEvidence(
-            selectedRiskId,
+            selectedTaskId,
             files
           );
 
@@ -955,9 +956,9 @@ export default function EvidencePage() {
   const handleDeleteEvidence =
     async (
       evidenceRecord:
-        RiskEvidence
+        TaskEvidence
     ) => {
-      if (!selectedRiskId) {
+      if (!selectedTaskId) {
         return;
       }
 
@@ -975,7 +976,7 @@ export default function EvidencePage() {
         setAlert(null);
 
         await deleteEvidence(
-          selectedRiskId,
+          selectedTaskId,
           evidenceRecord._id
         );
 
@@ -1005,7 +1006,7 @@ export default function EvidencePage() {
     async (
       evidenceType: EvidenceType
     ) => {
-      if (!selectedRiskId) {
+      if (!selectedTaskId) {
         return;
       }
 
@@ -1020,7 +1021,7 @@ export default function EvidencePage() {
 
       const confirmed =
         window.confirm(
-          `Delete all ${evidenceType} Evidence images from this Risk?`
+          `Delete all ${evidenceType} Evidence images from this Task?`
         );
 
       if (!confirmed) {
@@ -1036,11 +1037,11 @@ export default function EvidencePage() {
           "before"
         ) {
           await deleteBeforeEvidences(
-            selectedRiskId
+            selectedTaskId
           );
         } else {
           await deleteAfterEvidences(
-            selectedRiskId
+            selectedTaskId
           );
         }
 
@@ -1067,14 +1068,14 @@ export default function EvidencePage() {
     };
 
   /* =======================================================
-     UPDATE RISK STATUS
+     UPDATE TASK STATUS
      ======================================================= */
 
   const handleStatusAction =
     async () => {
       if (
-        !selectedRiskId ||
-        !selectedRisk
+        !selectedTaskId ||
+        !selectedTask
       ) {
         return;
       }
@@ -1084,11 +1085,11 @@ export default function EvidencePage() {
         setAlert(null);
 
         if (
-          selectedRisk.status ===
+          selectedTask.status ===
           "complete"
         ) {
-          await markRiskInProgress(
-            selectedRiskId
+          await markTaskInProgress(
+            selectedTaskId
           );
 
           await refreshSelectedData();
@@ -1096,7 +1097,7 @@ export default function EvidencePage() {
           setAlert({
             type: "success",
             message:
-              "Risk moved to In Progress successfully.",
+              "Task moved to In Progress successfully.",
           });
 
           return;
@@ -1108,14 +1109,14 @@ export default function EvidencePage() {
           setAlert({
             type: "error",
             message:
-              "At least one Before image and one After image are required before marking this Risk Complete.",
+              "At least one Before image and one After image are required before marking this Task Complete.",
           });
 
           return;
         }
 
-        await markRiskComplete(
-          selectedRiskId
+        await markTaskComplete(
+          selectedTaskId
         );
 
         await refreshSelectedData();
@@ -1123,7 +1124,7 @@ export default function EvidencePage() {
         setAlert({
           type: "success",
           message:
-            "Risk marked Complete successfully.",
+            "Task marked Complete successfully.",
         });
       } catch (error) {
         setAlert({
@@ -1161,7 +1162,18 @@ export default function EvidencePage() {
         : afterInputRef;
 
     return (
-      <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-6">
+      <section className={`relative overflow-hidden rounded-2xl border bg-white p-5 shadow-sm dark:bg-white/[0.03] sm:p-6 ${
+        isBefore
+          ? "border-amber-200 dark:border-amber-900/60"
+          : "border-emerald-200 dark:border-emerald-900/60"
+      }`}>
+        <div
+          className={`absolute inset-x-0 top-0 h-1 ${
+            isBefore
+              ? "bg-amber-500"
+              : "bg-emerald-500"
+          }`}
+        />
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
@@ -1187,8 +1199,8 @@ export default function EvidencePage() {
 
             <p className="mt-1 text-sm leading-6 text-gray-500 dark:text-gray-400">
               {isBefore
-                ? "Upload images showing the Risk condition before rectification."
-                : "Upload images showing the completed rectification work."}
+                ? "Upload images showing the Task condition before work/rectification."
+                : "Upload images showing the completed work/rectification."}
             </p>
           </div>
 
@@ -1382,28 +1394,33 @@ export default function EvidencePage() {
     <>
       <PageMeta
         title="Evidence Management | Zorays Project Tracker"
-        description="Manage Before and After Risk Evidence images."
+        description="Manage Before and After Task Evidence images."
       />
 
       <div className="space-y-6">
         {/* PAGE HEADER */}
 
-        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-6">
+        <section className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-6">
+          <div className="absolute inset-x-0 top-0 h-1 bg-emerald-500" />
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-600 dark:text-emerald-400">
-                Risk Management
-              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-600 dark:text-emerald-400">
+                  Task Register
+                </p>
 
-              <h1 className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
+                  <span className="size-1.5 rounded-full bg-emerald-500" />
+                  Evidence Workspace
+                </span>
+              </div>
+
+              <h1 className="mt-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-3xl">
                 Evidence Management
               </h1>
 
               <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-500 dark:text-gray-400">
-                Select a Project and
-                Risk to upload, view or
-                delete Before and After
-                Evidence images.
+                Select a Project and Task, then manage Before and After Evidence from one workspace.
               </p>
             </div>
 
@@ -1411,7 +1428,7 @@ export default function EvidencePage() {
               type="button"
               disabled={
                 projectsLoading ||
-                risksLoading ||
+                tasksLoading ||
                 detailLoading ||
                 actionLoading
               }
@@ -1421,16 +1438,16 @@ export default function EvidencePage() {
                 if (
                   selectedProjectId
                 ) {
-                  void loadProjectRisks(
+                  void loadProjectTasks(
                     selectedProjectId
                   );
                 }
 
                 if (
-                  selectedRiskId
+                  selectedTaskId
                 ) {
-                  void loadRiskDetails(
-                    selectedRiskId
+                  void loadTaskDetails(
+                    selectedTaskId
                   );
                 }
               }}
@@ -1459,6 +1476,16 @@ export default function EvidencePage() {
         {/* SELECTION */}
 
         <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-6">
+          <div className="mb-5">
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400">
+              Evidence Context
+            </p>
+
+            <h2 className="mt-1 text-base font-bold text-gray-900 dark:text-white">
+              Select Project & Task
+            </h2>
+          </div>
+
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
             {/* PROJECT */}
 
@@ -1508,58 +1535,52 @@ export default function EvidencePage() {
               </select>
             </div>
 
-            {/* RISK */}
+            {/* TASK */}
 
             <div>
               <label
-                htmlFor="evidence-risk"
+                htmlFor="evidence-task"
                 className="mb-2 block text-sm font-bold text-gray-700 dark:text-gray-300"
               >
-                Risk Record
+                Task Record
               </label>
 
               <select
-                id="evidence-risk"
+                id="evidence-task"
                 value={
-                  selectedRiskId
+                  selectedTaskId
                 }
                 disabled={
                   !selectedProjectId ||
-                  risksLoading
+                  tasksLoading
                 }
                 onChange={(event) => {
-                  setSelectedRiskId(
+                  setSelectedTaskId(
                     event.target.value
                   );
                 }}
                 className="h-12 w-full rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-800 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
               >
                 <option value="">
-                  {risksLoading
-                    ? "Loading risks..."
+                  {tasksLoading
+                    ? "Loading tasks..."
                     : !selectedProjectId
                       ? "Select Project first"
-                      : "Select Risk"}
+                      : "Select Task"}
                 </option>
 
-                {filteredRisks.map(
-                  (risk) => (
+                {filteredTasks.map(
+                  (task) => (
                     <option
                       key={
-                        risk._id
+                        task._id
                       }
                       value={
-                        risk._id
+                        task._id
                       }
                     >
-                      {risk.serialNo} —{" "}
-                      {
-                        risk.riskRegisterId
-                      }{" "}
-                      —{" "}
-                      {formatStatus(
-                        risk.status
-                      )}
+                      Task #{getTaskSerialLabel(task)} —{" "}
+                      {formatStatus(task.status)}
                     </option>
                   )
                 )}
@@ -1570,20 +1591,20 @@ export default function EvidencePage() {
 
             <div>
               <label
-                htmlFor="evidence-risk-search"
+                htmlFor="evidence-task-search"
                 className="mb-2 block text-sm font-bold text-gray-700 dark:text-gray-300"
               >
-                Search Risks
+                Search Tasks
               </label>
 
               <input
-                id="evidence-risk-search"
+                id="evidence-task-search"
                 type="search"
                 value={search}
                 disabled={
                   !selectedProjectId
                 }
-                placeholder="Serial No., Risk ID or description"
+                placeholder="Serial No. or description"
                 onChange={(event) => {
                   setSearch(
                     event.target.value
@@ -1606,22 +1627,35 @@ export default function EvidencePage() {
           )}
         </section>
 
-        {/* NO RISK SELECTED */}
+        {/* NO TASK SELECTED */}
 
-        {!selectedRiskId && (
+        {!selectedTaskId && (
           <section className="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-white px-6 text-center dark:border-gray-700 dark:bg-white/[0.03]">
-            <div className="flex size-16 items-center justify-center rounded-2xl bg-emerald-50 text-2xl font-bold text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
-              E
+            <div className="flex size-16 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-900">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="size-8"
+                aria-hidden="true"
+              >
+                <rect x="3" y="4" width="18" height="16" rx="2" />
+                <circle cx="8.5" cy="9" r="1.5" />
+                <path d="M21 15L16 10L6 20" />
+              </svg>
             </div>
 
             <h2 className="mt-5 text-lg font-bold text-gray-900 dark:text-white">
-              Select a Risk Record
+              Select a Task Record
             </h2>
 
             <p className="mt-2 max-w-lg text-sm leading-6 text-gray-500 dark:text-gray-400">
               Evidence management
               becomes available after a
-              Project and Risk have been
+              Project and Task have been
               selected.
             </p>
           </section>
@@ -1629,7 +1663,7 @@ export default function EvidencePage() {
 
         {/* DETAIL LOADING */}
 
-        {selectedRiskId &&
+        {selectedTaskId &&
           detailLoading && (
             <section className="animate-pulse rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
               <div className="h-6 w-52 rounded bg-gray-200 dark:bg-gray-800" />
@@ -1649,38 +1683,44 @@ export default function EvidencePage() {
             </section>
           )}
 
-        {/* RISK DETAILS */}
+        {/* TASK DETAILS */}
 
-        {selectedRisk &&
+        {selectedTask &&
           !detailLoading && (
             <>
-              <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-6">
+              <section className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-6">
+                <div className="absolute inset-x-0 top-0 h-1 bg-slate-500" />
+
                 <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                        {
-                          selectedRisk.riskRegisterId
-                        }
+                        Task #{getTaskSerialLabel(selectedTask)}
                       </h2>
+
+                      {selectedTask.taskRegisterId ? (
+                        <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700 dark:bg-blue-500/10 dark:text-blue-400">
+                          {selectedTask.taskRegisterId}
+                        </span>
+                      ) : null}
 
                       <span
                         className={`rounded-full px-3 py-1 text-xs font-bold ${
-                          selectedRisk.status ===
+                          selectedTask.status ===
                           "complete"
                             ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400"
                             : "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400"
                         }`}
                       >
                         {formatStatus(
-                          selectedRisk.status
+                          selectedTask.status
                         )}
                       </span>
                     </div>
 
                     <p className="mt-3 max-w-4xl text-sm leading-7 text-gray-600 dark:text-gray-300">
                       {
-                        selectedRisk.description
+                        selectedTask.description
                       }
                     </p>
                   </div>
@@ -1689,7 +1729,7 @@ export default function EvidencePage() {
                     type="button"
                     disabled={
                       actionLoading ||
-                      (selectedRisk.status ===
+                      (selectedTask.status ===
                         "in_progress" &&
                         !evidence.canMarkComplete)
                     }
@@ -1697,7 +1737,7 @@ export default function EvidencePage() {
                       void handleStatusAction();
                     }}
                     className={`inline-flex h-11 shrink-0 items-center justify-center rounded-xl px-5 text-sm font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                      selectedRisk.status ===
+                      selectedTask.status ===
                       "complete"
                         ? "bg-amber-600 hover:bg-amber-700"
                         : "bg-emerald-600 hover:bg-emerald-700"
@@ -1705,7 +1745,7 @@ export default function EvidencePage() {
                   >
                     {actionLoading
                       ? "Processing..."
-                      : selectedRisk.status ===
+                      : selectedTask.status ===
                           "complete"
                         ? "Move to In Progress"
                         : "Mark Complete"}
@@ -1715,12 +1755,12 @@ export default function EvidencePage() {
                 <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
                   <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900/60">
                     <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">
-                      Project Code
+                      Project Reference
                     </p>
 
                     <p className="mt-2 font-bold text-gray-900 dark:text-white">
                       {
-                        selectedRisk.projectCode
+                        selectedTask.projectCode
                       }
                     </p>
                   </div>
@@ -1731,9 +1771,9 @@ export default function EvidencePage() {
                     </p>
 
                     <p className="mt-2 font-bold text-gray-900 dark:text-white">
-                      {
-                        selectedRisk.serialNo
-                      }
+                      {getTaskSerialLabel(
+                        selectedTask
+                      )}
                     </p>
                   </div>
 
@@ -1762,7 +1802,7 @@ export default function EvidencePage() {
                   </div>
                 </div>
 
-                {selectedRisk.status ===
+                {selectedTask.status ===
                   "in_progress" &&
                   !evidence.canMarkComplete && (
                     <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-400">
@@ -1774,7 +1814,7 @@ export default function EvidencePage() {
                   )}
               </section>
 
-              <div className="grid grid-cols-1 gap-6 2xl:grid-cols-2">
+              <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
                 {renderEvidenceSection(
                   "before"
                 )}

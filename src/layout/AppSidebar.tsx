@@ -107,19 +107,19 @@ const navItems: NavItem[] = [
   {
     icon: <TableIcon />,
 
-    name: "Risk Register",
+    name: "Task Register",
 
     subItems: [
       {
-        name: "Risk Register",
+        name: "Task Register",
 
-        path: "/risks",
+        path: "/tasks",
       },
 
       {
-        name: "Create Risk",
+        name: "Create Task",
 
-        path: "/risks/create",
+        path: "/tasks/create",
       },
     ],
   },
@@ -836,7 +836,7 @@ const AppSidebar: React.FC = () => {
             </div>
 
             <p className="mt-1 text-[10px] leading-4 text-gray-400">
-              Risk & Electrical Safety Management
+              Task & Project Progress Management
             </p>
           </div>
         </div>

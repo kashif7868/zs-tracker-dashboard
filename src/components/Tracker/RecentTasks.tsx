@@ -9,10 +9,12 @@ import {
 } from "react-router";
 
 import {
-  getRisks,
-  type Risk,
-  type RiskStatus,
-} from "../../services/risk/risk.service";
+  getTasks,
+  getTaskProjectReference,
+  getTaskSerialLabel,
+  type Task,
+  type TaskStatus,
+} from "../../services/task_register/task.service";
 
 /* =========================================================
    TYPES
@@ -20,13 +22,13 @@ import {
 
 type WorkFilter =
   | "all"
-  | RiskStatus;
+  | TaskStatus;
 
 /* =========================================================
    CONSTANTS
    ========================================================= */
 
-const RECENT_RISK_LIMIT = 6;
+const RECENT_TASK_LIMIT = 6;
 
 /* =========================================================
    ICONS
@@ -156,7 +158,7 @@ const getErrorMessage = (
         ?.msg ||
       requestError.response
         ?.data?.message ||
-      "Recent Risks could not be loaded."
+      "Recent Tasks could not be loaded."
     );
   }
 
@@ -166,7 +168,7 @@ const getErrorMessage = (
     return error.message;
   }
 
-  return "Recent Risks could not be loaded.";
+  return "Recent Tasks could not be loaded.";
 };
 
 const formatDate = (
@@ -202,28 +204,30 @@ const formatDate = (
   ).format(date);
 };
 
-const getRiskReference = (
-  risk: Risk
+const getTaskReference = (
+  task: Task
 ): string => {
   const registerId =
-    risk.riskRegisterId
+    task.taskRegisterId
       ?.trim();
 
   if (registerId) {
     return registerId;
   }
 
-  return `Risk #${risk.serialNo}`;
+  return `Task #${getTaskSerialLabel(
+    task
+  )}`;
 };
 
 /* =========================================================
    STATUS BADGE
    ========================================================= */
 
-function RiskStatusBadge({
+function TaskStatusBadge({
   status,
 }: {
-  status: RiskStatus;
+  status: TaskStatus;
 }) {
   if (
     status === "complete"
@@ -332,7 +336,7 @@ function LoadingRows() {
    COMPONENT
    ========================================================= */
 
-export default function RecentRisks() {
+export default function RecentTasks() {
   const [
     selectedFilter,
     setSelectedFilter,
@@ -342,10 +346,10 @@ export default function RecentRisks() {
     );
 
   const [
-    risks,
-    setRisks,
+    tasks,
+    setTasks,
   ] =
-    useState<Risk[]>([]);
+    useState<Task[]>([]);
 
   const [
     loading,
@@ -366,10 +370,10 @@ export default function RecentRisks() {
     useState("");
 
   /* =======================================================
-     LOAD RECENT RISKS
+     LOAD RECENT TASKS
      ======================================================= */
 
-  const loadRecentRisks =
+  const loadRecentTasks =
     useCallback(
       async (
         showRefreshLoader = false
@@ -390,7 +394,7 @@ export default function RecentRisks() {
           setError("");
 
           const result =
-            await getRisks({
+            await getTasks({
               ...(selectedFilter !==
               "all"
                 ? {
@@ -402,7 +406,7 @@ export default function RecentRisks() {
               page: 1,
 
               limit:
-                RECENT_RISK_LIMIT,
+                RECENT_TASK_LIMIT,
 
               sortBy:
                 "createdAt",
@@ -411,13 +415,13 @@ export default function RecentRisks() {
                 "desc",
             });
 
-          setRisks(
-            result.risks
+          setTasks(
+            result.tasks
           );
         } catch (
           requestError
         ) {
-          setRisks([]);
+          setTasks([]);
 
           setError(
             getErrorMessage(
@@ -440,9 +444,9 @@ export default function RecentRisks() {
     );
 
   useEffect(() => {
-    void loadRecentRisks();
+    void loadRecentTasks();
   }, [
-    loadRecentRisks,
+    loadRecentTasks,
   ]);
 
   /* =======================================================
@@ -451,18 +455,14 @@ export default function RecentRisks() {
 
   return (
     <section className="flex h-full w-full min-w-0 max-w-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
-      {/* ===================================================
-          HEADER
-          =================================================== */}
+      {/* HEADER */}
 
       <div className="border-b border-gray-100 px-4 py-5 dark:border-gray-800 sm:px-5">
         <div className="flex min-w-0 flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          {/* TITLE */}
-
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-                Recent Risks
+                Recent Tasks
               </h3>
 
               <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
@@ -473,11 +473,9 @@ export default function RecentRisks() {
             </div>
 
             <p className="mt-1.5 text-sm leading-5 text-gray-500 dark:text-gray-400">
-              Latest Risk Register activity and Evidence status.
+              Latest Task Register activity and Before/After Evidence status.
             </p>
           </div>
-
-          {/* ACTIONS */}
 
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <select
@@ -496,7 +494,7 @@ export default function RecentRisks() {
                     .value as WorkFilter
                 )
               }
-              aria-label="Filter recent risks"
+              aria-label="Filter recent tasks"
               className="h-9 min-w-0 max-w-full rounded-lg border border-gray-300 bg-white px-3 text-xs font-medium text-gray-700 outline-none transition hover:bg-gray-50 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:focus:ring-emerald-500/10"
             >
               <option value="all">
@@ -514,13 +512,13 @@ export default function RecentRisks() {
 
             <button
               type="button"
-              title="Refresh Recent Risks"
+              title="Refresh Recent Tasks"
               disabled={
                 loading ||
                 refreshing
               }
               onClick={() => {
-                void loadRecentRisks(
+                void loadRecentTasks(
                   true
                 );
               }}
@@ -538,15 +536,13 @@ export default function RecentRisks() {
             </button>
 
             <Link
-              to="/risks"
+              to="/tasks"
               className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-white px-3 text-xs font-semibold text-gray-700 transition hover:bg-gray-50 hover:text-emerald-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03] dark:hover:text-emerald-400"
             >
               See All
             </Link>
           </div>
         </div>
-
-        {/* ERROR */}
 
         {error ? (
           <div className="mt-4 flex min-w-0 flex-col gap-3 overflow-hidden rounded-xl border border-red-200 bg-red-50 p-3 dark:border-red-900 dark:bg-red-950/30 sm:flex-row sm:items-center sm:justify-between">
@@ -557,7 +553,7 @@ export default function RecentRisks() {
             <button
               type="button"
               onClick={() => {
-                void loadRecentRisks();
+                void loadRecentTasks();
               }}
               className="inline-flex h-8 shrink-0 items-center justify-center rounded-lg border border-red-200 bg-white px-3 text-xs font-bold text-red-700 dark:border-red-900 dark:bg-gray-900 dark:text-red-400"
             >
@@ -567,16 +563,13 @@ export default function RecentRisks() {
         ) : null}
       </div>
 
-      {/* ===================================================
-          COLUMN HEADERS
-          DESKTOP ONLY
-          =================================================== */}
+      {/* COLUMN HEADERS */}
 
       {!loading &&
-      risks.length > 0 ? (
+      tasks.length > 0 ? (
         <div className="hidden grid-cols-[minmax(0,1.8fr)_minmax(100px,0.65fr)_minmax(130px,0.8fr)_auto] gap-4 border-b border-gray-100 bg-gray-50/60 px-5 py-2.5 text-[10px] font-bold uppercase tracking-wide text-gray-400 dark:border-gray-800 dark:bg-gray-950/20 lg:grid">
           <span>
-            Risk
+            Task
           </span>
 
           <span>
@@ -593,14 +586,12 @@ export default function RecentRisks() {
         </div>
       ) : null}
 
-      {/* ===================================================
-          RISK LIST
-          =================================================== */}
+      {/* TASK LIST */}
 
       <div className="min-w-0 flex-1">
         {loading ? (
           <LoadingRows />
-        ) : risks.length ===
+        ) : tasks.length ===
           0 ? (
           <div className="flex min-h-[390px] flex-col items-center justify-center px-5 py-10 text-center">
             <div className="flex size-14 items-center justify-center rounded-2xl bg-gray-100 text-xl font-bold text-gray-400 dark:bg-gray-800">
@@ -608,99 +599,96 @@ export default function RecentRisks() {
             </div>
 
             <p className="mt-4 text-sm font-semibold text-gray-700 dark:text-gray-300">
-              No matching Risk records
+              No matching Task records
             </p>
 
             <p className="mt-1 max-w-xs text-xs leading-5 text-gray-500 dark:text-gray-400">
-              Current status filter has no Risk records.
+              Current status filter has no Task Register records.
             </p>
 
             <Link
-              to="/risks/create"
+              to="/tasks/create"
               className="mt-4 inline-flex h-9 items-center justify-center rounded-lg bg-emerald-600 px-4 text-xs font-bold text-white transition hover:bg-emerald-700"
             >
-              Create Risk
+              Create Task
             </Link>
           </div>
         ) : (
           <div className="divide-y divide-gray-100 dark:divide-gray-800">
-            {risks.map(
+            {tasks.map(
               (
-                risk
+                task
               ) => {
                 const beforeCount =
-                  risk.evidenceSummary
+                  task.evidenceSummary
                     ?.beforeCount ??
                   0;
 
                 const afterCount =
-                  risk.evidenceSummary
+                  task.evidenceSummary
                     ?.afterCount ??
                   0;
+
+                const projectReference =
+                  getTaskProjectReference(
+                    task
+                  );
 
                 return (
                   <article
                     key={
-                      risk._id
+                      task._id
                     }
                     className={`min-w-0 px-4 py-4 transition sm:px-5 ${
-                      risk.status ===
+                      task.status ===
                       "complete"
                         ? "bg-emerald-50/10 hover:bg-emerald-50/30 dark:bg-emerald-950/[0.03] dark:hover:bg-emerald-950/10"
                         : "hover:bg-gray-50/70 dark:hover:bg-white/[0.02]"
                     }`}
                   >
-                    {/* =====================================
-                        DESKTOP ROW
-                        ===================================== */}
+                    {/* DESKTOP */}
 
                     <div className="hidden min-w-0 grid-cols-[minmax(0,1.8fr)_minmax(100px,0.65fr)_minmax(130px,0.8fr)_auto] items-center gap-4 lg:grid">
-                      {/* RISK */}
-
                       <div className="flex min-w-0 items-start gap-3">
                         <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gray-100 px-2 text-xs font-bold text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                          {
-                            risk.serialNo
-                          }
+                          {getTaskSerialLabel(
+                            task
+                          )}
                         </div>
 
                         <div className="min-w-0">
                           <Link
-                            to={`/risks/${risk._id}`}
+                            to={`/tasks/${task._id}`}
                             className="block truncate text-sm font-semibold text-gray-800 transition hover:text-emerald-600 dark:text-white/90 dark:hover:text-emerald-400"
                           >
-                            {getRiskReference(
-                              risk
+                            {getTaskReference(
+                              task
                             )}
                           </Link>
 
                           <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-gray-500 dark:text-gray-400">
                             {
-                              risk.description
+                              task.description
                             }
                           </p>
 
                           <p className="mt-1 text-[10px] text-gray-400 dark:text-gray-500">
                             Updated{" "}
                             {formatDate(
-                              risk.updatedAt
+                              task.updatedAt
                             )}
                           </p>
                         </div>
                       </div>
 
-                      {/* PROJECT REFERENCE */}
-
                       <div className="min-w-0">
                         <span className="inline-flex max-w-full rounded-lg bg-gray-100 px-2.5 py-1.5 text-[10px] font-bold text-gray-600 dark:bg-gray-800 dark:text-gray-300">
                           <span className="truncate">
-                            {risk.projectCode ||
+                            {projectReference ||
                               "—"}
                           </span>
                         </span>
                       </div>
-
-                      {/* EVIDENCE */}
 
                       <div className="grid min-w-0 grid-cols-2 gap-2">
                         <EvidenceBadge
@@ -718,56 +706,50 @@ export default function RecentRisks() {
                         />
                       </div>
 
-                      {/* STATUS */}
-
                       <div className="flex justify-end">
-                        <RiskStatusBadge
+                        <TaskStatusBadge
                           status={
-                            risk.status
+                            task.status
                           }
                         />
                       </div>
                     </div>
 
-                    {/* =====================================
-                        MOBILE / TABLET CARD
-                        ===================================== */}
+                    {/* MOBILE */}
 
                     <div className="min-w-0 lg:hidden">
                       <div className="flex min-w-0 items-start gap-3">
                         <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gray-100 px-2 text-xs font-bold text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                          {
-                            risk.serialNo
-                          }
+                          {getTaskSerialLabel(
+                            task
+                          )}
                         </div>
 
                         <div className="min-w-0 flex-1">
                           <div className="flex min-w-0 items-start justify-between gap-3">
                             <div className="min-w-0 flex-1">
                               <Link
-                                to={`/risks/${risk._id}`}
+                                to={`/tasks/${task._id}`}
                                 className="block truncate text-sm font-semibold text-gray-800 transition hover:text-emerald-600 dark:text-white/90 dark:hover:text-emerald-400"
                               >
-                                {getRiskReference(
-                                  risk
+                                {getTaskReference(
+                                  task
                                 )}
                               </Link>
 
                               <p className="mt-1 line-clamp-2 text-xs leading-5 text-gray-500 dark:text-gray-400">
                                 {
-                                  risk.description
+                                  task.description
                                 }
                               </p>
                             </div>
 
-                            <RiskStatusBadge
+                            <TaskStatusBadge
                               status={
-                                risk.status
+                                task.status
                               }
                             />
                           </div>
-
-                          {/* PROJECT */}
 
                           <div className="mt-3 flex min-w-0 items-center gap-2 text-[10px]">
                             <span className="shrink-0 font-semibold uppercase tracking-wide text-gray-400">
@@ -775,12 +757,10 @@ export default function RecentRisks() {
                             </span>
 
                             <span className="min-w-0 truncate font-bold text-gray-600 dark:text-gray-300">
-                              {risk.projectCode ||
+                              {projectReference ||
                                 "—"}
                             </span>
                           </div>
-
-                          {/* EVIDENCE */}
 
                           <div className="mt-3 grid min-w-0 grid-cols-2 gap-2">
                             <EvidenceBadge
@@ -801,7 +781,7 @@ export default function RecentRisks() {
                           <p className="mt-2 text-[10px] text-gray-400 dark:text-gray-500">
                             Updated{" "}
                             {formatDate(
-                              risk.updatedAt
+                              task.updatedAt
                             )}
                           </p>
                         </div>
@@ -815,29 +795,27 @@ export default function RecentRisks() {
         )}
       </div>
 
-      {/* ===================================================
-          FOOTER
-          =================================================== */}
+      {/* FOOTER */}
 
       {!loading &&
-      risks.length > 0 ? (
+      tasks.length > 0 ? (
         <div className="flex min-w-0 items-center justify-between gap-3 border-t border-gray-100 bg-gray-50/40 px-4 py-3 dark:border-gray-800 dark:bg-gray-950/20 sm:px-5">
           <p className="text-[11px] text-gray-500 dark:text-gray-400">
             Showing latest{" "}
             {
-              risks.length
+              tasks.length
             }{" "}
-            Risk
-            {risks.length === 1
+            Task
+            {tasks.length === 1
               ? ""
               : "s"}
           </p>
 
           <Link
-            to="/risks"
+            to="/tasks"
             className="shrink-0 text-[11px] font-bold text-emerald-600 transition hover:text-emerald-700 dark:text-emerald-400"
           >
-            View Risk Register
+            View Task Register
           </Link>
         </div>
       ) : null}

@@ -19,38 +19,35 @@ import {
 } from "../../services/project/project.service";
 
 import {
-  deleteRisk,
-  getRiskDashboardSummary,
-  getRiskProjectReference,
-  getRisks,
-  type Risk,
-  type RiskDashboardSummary,
-  type RiskStatus,
-} from "../../services/risk/risk.service";
+  deleteTask,
+  getTaskDashboardSummary,
+  getTaskProjectReference,
+  getTaskSerialLabel,
+  getTasks,
+  type Task,
+  type TaskDashboardSummary,
+  type TaskStatus,
+} from "../../services/task_register/task.service";
 
 /* =========================================================
-   TYPES
+   TYPES / CONSTANTS
    ========================================================= */
 
 type StatusFilter =
   | "all"
-  | RiskStatus;
-
-/* =========================================================
-   CONSTANTS
-   ========================================================= */
+  | TaskStatus;
 
 const PAGE_LIMIT = 20;
 
-const EMPTY_SUMMARY: RiskDashboardSummary = {
-  totalRisks: 0,
-  inProgressRisks: 0,
-  completeRisks: 0,
+const EMPTY_SUMMARY: TaskDashboardSummary = {
+  totalTasks: 0,
+  inProgressTasks: 0,
+  completeTasks: 0,
   completionPercentage: 0,
 };
 
 const STATUS_LABELS: Record<
-  RiskStatus,
+  TaskStatus,
   string
 > = {
   in_progress: "In Progress",
@@ -82,48 +79,6 @@ const RefreshIcon = () => (
   </svg>
 );
 
-const ProgressIcon = () => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className="size-4"
-    aria-hidden="true"
-  >
-    <circle
-      cx="12"
-      cy="12"
-      r="9"
-    />
-
-    <path d="M12 7V12L15 14" />
-  </svg>
-);
-
-const CompleteIcon = () => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className="size-4"
-    aria-hidden="true"
-  >
-    <circle
-      cx="12"
-      cy="12"
-      r="9"
-    />
-
-    <path d="M8 12L11 15L16 9" />
-  </svg>
-);
-
 const ViewIcon = () => (
   <svg
     viewBox="0 0 24 24"
@@ -136,12 +91,7 @@ const ViewIcon = () => (
     aria-hidden="true"
   >
     <path d="M2.5 12S6 6.5 12 6.5S21.5 12 21.5 12S18 17.5 12 17.5S2.5 12 2.5 12Z" />
-
-    <circle
-      cx="12"
-      cy="12"
-      r="2.5"
-    />
+    <circle cx="12" cy="12" r="2.5" />
   </svg>
 );
 
@@ -157,7 +107,6 @@ const EditIcon = () => (
     aria-hidden="true"
   >
     <path d="M12 20H5A1 1 0 0 1 4 19V12" />
-
     <path d="M16.5 3.5A2.12 2.12 0 0 1 19.5 6.5L10 16L6 17L7 13L16.5 3.5Z" />
   </svg>
 );
@@ -192,20 +141,8 @@ const ImageIcon = () => (
     className="size-4"
     aria-hidden="true"
   >
-    <rect
-      x="3"
-      y="4"
-      width="18"
-      height="16"
-      rx="2"
-    />
-
-    <circle
-      cx="8.5"
-      cy="9"
-      r="1.5"
-    />
-
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <circle cx="8.5" cy="9" r="1.5" />
     <path d="M21 15L16 10L6 20" />
   </svg>
 );
@@ -227,7 +164,6 @@ const getErrorMessage = (
         data?: {
           message?: string;
           error?: string;
-
           errors?: Array<{
             message?: string;
             msg?: string;
@@ -283,56 +219,48 @@ const formatDate = (
   ).format(date);
 };
 
-const getRiskDisplayTitle = (
-  risk: Risk
-): string => {
-  return (
-    risk.riskRegisterId?.trim() ||
-    `Risk #${risk.serialNo}`
-  );
-};
+const getTaskDisplayLabel = (
+  task: Task
+): string =>
+  `Task #${getTaskSerialLabel(
+    task
+  )}`;
 
 /* =========================================================
-   STATUS BADGE
+   SMALL COMPONENTS
    ========================================================= */
 
-function RiskStatusBadge({
+function TaskStatusBadge({
   status,
 }: {
-  status: RiskStatus;
+  status: TaskStatus;
 }) {
-  if (
-    status === "complete"
-  ) {
-    return (
-      <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-400">
-        <span className="flex size-5 items-center justify-center rounded-full bg-emerald-600 text-white">
-          <CompleteIcon />
-        </span>
-
-        Complete
-      </span>
-    );
-  }
+  const classes: Record<
+    TaskStatus,
+    string
+  > = {
+    in_progress:
+      "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-400",
+    complete:
+      "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-400",
+  };
 
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-400">
-      <span className="relative flex size-5 items-center justify-center">
-        <span className="absolute size-5 animate-ping rounded-full bg-amber-400 opacity-25" />
+    <span
+      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold ${classes[status]}`}
+    >
+      <span
+        className={`size-2 rounded-full ${
+          status === "complete"
+            ? "bg-emerald-500"
+            : "bg-amber-500"
+        }`}
+      />
 
-        <span className="relative flex size-5 items-center justify-center rounded-full bg-amber-500 text-white">
-          <ProgressIcon />
-        </span>
-      </span>
-
-      In Progress
+      {STATUS_LABELS[status]}
     </span>
   );
 }
-
-/* =========================================================
-   EVIDENCE COUNT
-   ========================================================= */
 
 function EvidenceCount({
   count,
@@ -355,10 +283,6 @@ function EvidenceCount({
     </div>
   );
 }
-
-/* =========================================================
-   SUMMARY CARD
-   ========================================================= */
 
 type SummaryCardProps = {
   title: string;
@@ -391,7 +315,6 @@ function SummaryCard({
             <span
               className={`absolute inline-flex size-full animate-ping rounded-full opacity-30 ${accentClassName}`}
             />
-
             <span
               className={`relative inline-flex size-3 rounded-full ${accentClassName}`}
             />
@@ -409,10 +332,6 @@ function SummaryCard({
     </article>
   );
 }
-
-/* =========================================================
-   LOADING TABLE
-   ========================================================= */
 
 function LoadingTable() {
   return (
@@ -433,7 +352,7 @@ function LoadingTable() {
    MAIN PAGE
    ========================================================= */
 
-export default function RisksPage() {
+export default function TaskRegisterPage() {
   const [
     searchParams,
     setSearchParams,
@@ -457,15 +376,15 @@ export default function RisksPage() {
   );
 
   const [
-    risks,
-    setRisks,
-  ] = useState<Risk[]>([]);
+    tasks,
+    setTasks,
+  ] = useState<Task[]>([]);
 
   const [
     summary,
     setSummary,
   ] =
-    useState<RiskDashboardSummary>(
+    useState<TaskDashboardSummary>(
       EMPTY_SUMMARY
     );
 
@@ -513,8 +432,8 @@ export default function RisksPage() {
   ] = useState(false);
 
   const [
-    deletingRiskId,
-    setDeletingRiskId,
+    deletingTaskId,
+    setDeletingTaskId,
   ] = useState("");
 
   const [
@@ -543,7 +462,7 @@ export default function RisksPage() {
   ]);
 
   /* =======================================================
-     LOAD ACTIVE PROJECTS
+     LOAD PROJECTS
      ======================================================= */
 
   useEffect(() => {
@@ -604,10 +523,10 @@ export default function RisksPage() {
   ]);
 
   /* =======================================================
-     LOAD RISK REGISTER
+     LOAD TASK REGISTER
      ======================================================= */
 
-  const loadRiskRegister =
+  const loadTaskRegister =
     useCallback(
       async (
         showRefreshLoader = false
@@ -624,11 +543,11 @@ export default function RisksPage() {
           setError("");
 
           const [
-            risksResult,
+            tasksResult,
             summaryResult,
           ] =
             await Promise.allSettled([
-              getRisks({
+              getTasks({
                 ...(selectedProjectId
                   ? {
                       projectId:
@@ -653,28 +572,30 @@ export default function RisksPage() {
 
                 page,
                 limit: PAGE_LIMIT,
-                sortBy: "serialNo",
-                sortOrder: "asc",
+                sortBy:
+                  "serialNo",
+                sortOrder:
+                  "asc",
               }),
 
-              getRiskDashboardSummary(
+              getTaskDashboardSummary(
                 selectedProjectId ||
                   undefined
               ),
             ]);
 
           if (
-            risksResult.status ===
+            tasksResult.status ===
             "rejected"
           ) {
-            throw risksResult.reason;
+            throw tasksResult.reason;
           }
 
           const result =
-            risksResult.value;
+            tasksResult.value;
 
-          setRisks(
-            result.risks
+          setTasks(
+            result.tasks
           );
 
           setTotalPages(
@@ -683,7 +604,8 @@ export default function RisksPage() {
           );
 
           setTotalRecords(
-            result.pagination.total
+            result.pagination
+              .total
           );
 
           if (
@@ -705,7 +627,7 @@ export default function RisksPage() {
             )
           );
 
-          setRisks([]);
+          setTasks([]);
           setTotalPages(1);
           setTotalRecords(0);
           setSummary(
@@ -725,8 +647,8 @@ export default function RisksPage() {
     );
 
   useEffect(() => {
-    void loadRiskRegister();
-  }, [loadRiskRegister]);
+    void loadTaskRegister();
+  }, [loadTaskRegister]);
 
   /* =======================================================
      SELECTED PROJECT
@@ -757,15 +679,15 @@ export default function RisksPage() {
       [selectedProject]
     );
 
-  const createRiskPath =
+  const createTaskPath =
     selectedProjectId
-      ? `/risks/create?projectId=${encodeURIComponent(
+      ? `/tasks/create?projectId=${encodeURIComponent(
           selectedProjectId
         )}`
-      : "/risks/create";
+      : "/tasks/create";
 
   /* =======================================================
-     PROJECT FILTER
+     FILTERS
      ======================================================= */
 
   const handleProjectFilterChange = (
@@ -801,12 +723,9 @@ export default function RisksPage() {
     );
   };
 
-  /* =======================================================
-     SEARCH
-     ======================================================= */
-
   const handleSearch = (
-    event: FormEvent<HTMLFormElement>
+    event:
+      FormEvent<HTMLFormElement>
   ) => {
     event.preventDefault();
 
@@ -842,21 +761,18 @@ export default function RisksPage() {
   };
 
   /* =======================================================
-     DELETE RISK
+     DELETE TASK
      ======================================================= */
 
-  const handleDeleteRisk =
+  const handleDeleteTask =
     async (
-      risk: Risk
+      task: Task
     ) => {
-      const riskTitle =
-        getRiskDisplayTitle(
-          risk
-        );
-
       const confirmed =
         window.confirm(
-          `Delete ${riskTitle}?\n\nRisk record, Before Evidence, After Evidence and related image files will be permanently deleted.`
+          `Delete ${getTaskDisplayLabel(
+            task
+          )}?\n\nTask record, Before Evidence, After Evidence and related image files will be permanently deleted.`
         );
 
       if (!confirmed) {
@@ -864,18 +780,18 @@ export default function RisksPage() {
       }
 
       try {
-        setDeletingRiskId(
-          risk._id
+        setDeletingTaskId(
+          task._id
         );
 
         setError("");
 
-        await deleteRisk(
-          risk._id
+        await deleteTask(
+          task._id
         );
 
         if (
-          risks.length === 1 &&
+          tasks.length === 1 &&
           page > 1
         ) {
           setPage(
@@ -889,7 +805,7 @@ export default function RisksPage() {
           return;
         }
 
-        await loadRiskRegister(
+        await loadTaskRegister(
           true
         );
       } catch (requestError) {
@@ -899,7 +815,7 @@ export default function RisksPage() {
           )
         );
       } finally {
-        setDeletingRiskId(
+        setDeletingTaskId(
           ""
         );
       }
@@ -912,26 +828,21 @@ export default function RisksPage() {
   return (
     <div className="w-full min-w-0 max-w-full overflow-x-hidden">
       <div className="w-full min-w-0 space-y-5 p-4 sm:p-5 xl:p-6">
-        {/* =================================================
-            HEADER
-            ================================================= */}
+        {/* HEADER */}
 
         <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03] sm:p-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-400">
-                Electrical Safety Management
+                Project Progress Management
               </p>
 
               <h1 className="mt-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-3xl">
-                Risk Register
+                Task Register
               </h1>
 
               <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-500 dark:text-gray-400">
-                Project risks, Before
-                Evidence, After Evidence
-                aur completion status
-                manage karein.
+                Daily project work ko simple Task records mein manage karein. Sr. No. automatically continuous show hota hai, date/time backend se auto record hota hai, aur completion Before/After Evidence ke sath track hoti hai.
               </p>
 
               {selectedProject ? (
@@ -960,9 +871,11 @@ export default function RisksPage() {
             <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row">
               <button
                 type="button"
-                disabled={refreshing}
+                disabled={
+                  refreshing
+                }
                 onClick={() => {
-                  void loadRiskRegister(
+                  void loadTaskRegister(
                     true
                   );
                 }}
@@ -984,18 +897,18 @@ export default function RisksPage() {
               </button>
 
               <Link
-                to={createRiskPath}
+                to={
+                  createTaskPath
+                }
                 className="inline-flex h-11 items-center justify-center rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
               >
-                Create Risk
+                Create Task
               </Link>
             </div>
           </div>
         </section>
 
-        {/* =================================================
-            ERROR
-            ================================================= */}
+        {/* ERROR */}
 
         {error ? (
           <div className="rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/30">
@@ -1005,29 +918,27 @@ export default function RisksPage() {
           </div>
         ) : null}
 
-        {/* =================================================
-            SUMMARY
-            ================================================= */}
+        {/* SUMMARY */}
 
-        <section className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <SummaryCard
-            title="Total Risks"
+            title="Total Tasks"
             value={
-              summary.totalRisks
+              summary.totalTasks
             }
-            description="Total Risk Register records"
+            description="All daily Task records"
             accentClassName="bg-slate-500"
           />
 
           <SummaryCard
             title="In Progress"
             value={
-              summary.inProgressRisks
+              summary.inProgressTasks
             }
-            description="Active rectification work"
+            description="Current project work in progress"
             accentClassName="bg-amber-500"
             pulse={
-              summary.inProgressRisks >
+              summary.inProgressTasks >
               0
             }
           />
@@ -1035,49 +946,44 @@ export default function RisksPage() {
           <SummaryCard
             title="Complete"
             value={
-              summary.completeRisks
+              summary.completeTasks
             }
-            description="Before and After Evidence completed"
+            description={`${summary.completionPercentage}% overall completion`}
             accentClassName="bg-emerald-500"
-          />
-
-          <SummaryCard
-            title="Completion"
-            value={`${summary.completionPercentage}%`}
-            description="Overall completed risk percentage"
-            accentClassName="bg-blue-500"
           />
         </section>
 
-        {/* =================================================
-            FILTERS
-            ================================================= */}
+        {/* FILTERS */}
 
         <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
           <form
-            onSubmit={handleSearch}
+            onSubmit={
+              handleSearch
+            }
             className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[minmax(260px,1fr)_minmax(220px,280px)_minmax(180px,220px)_auto]"
           >
             <div className="min-w-0">
               <label
-                htmlFor="risk-search"
+                htmlFor="task-search"
                 className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400"
               >
                 Search
               </label>
 
               <input
-                id="risk-search"
+                id="task-search"
                 type="search"
                 value={
                   searchInput
                 }
-                onChange={(event) =>
+                onChange={(
+                  event
+                ) =>
                   setSearchInput(
                     event.target.value
                   )
                 }
-                placeholder="Sr. No., Risk ID, Project Reference or description..."
+                placeholder="Project Reference or description..."
                 className={
                   INPUT_CLASSES
                 }
@@ -1097,7 +1003,9 @@ export default function RisksPage() {
                 value={
                   selectedProjectId
                 }
-                onChange={(event) =>
+                onChange={(
+                  event
+                ) =>
                   handleProjectFilterChange(
                     event.target.value
                   )
@@ -1142,7 +1050,9 @@ export default function RisksPage() {
                 value={
                   statusFilter
                 }
-                onChange={(event) => {
+                onChange={(
+                  event
+                ) => {
                   setStatusFilter(
                     event.target
                       .value as StatusFilter
@@ -1189,15 +1099,13 @@ export default function RisksPage() {
           </form>
         </section>
 
-        {/* =================================================
-            RISK TABLE
-            ================================================= */}
+        {/* REGISTER */}
 
         <section className="min-w-0 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="flex flex-col gap-2 border-b border-gray-200 px-5 py-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div>
               <h2 className="text-base font-bold text-gray-900 dark:text-white">
-                Risk Register Records
+                Task Register Records
               </h2>
 
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
@@ -1209,15 +1117,11 @@ export default function RisksPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-4 text-xs font-semibold">
-              <span className="inline-flex items-center gap-2 text-amber-700 dark:text-amber-400">
-                <span className="size-2 animate-pulse rounded-full bg-amber-500" />
-
+              <span className="text-amber-700 dark:text-amber-400">
                 In Progress
               </span>
 
-              <span className="inline-flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
-                <span className="size-2 rounded-full bg-emerald-500" />
-
+              <span className="text-emerald-700 dark:text-emerald-400">
                 Complete
               </span>
             </div>
@@ -1225,46 +1129,40 @@ export default function RisksPage() {
 
           {loading ? (
             <LoadingTable />
-          ) : risks.length === 0 ? (
+          ) : tasks.length ===
+            0 ? (
             <div className="px-5 py-14 text-center sm:px-6">
               <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-gray-100 text-xl font-bold text-gray-400 dark:bg-gray-800">
                 0
               </div>
 
               <h3 className="mt-4 text-base font-bold text-gray-900 dark:text-white">
-                No risk records found
+                No task records found
               </h3>
 
               <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                Current project, search
-                ya status filter ke
-                mutabiq koi record nahi
-                mila.
+                Current project, search ya status filter ke mutabiq koi record nahi mila.
               </p>
 
               <Link
-                to={createRiskPath}
+                to={
+                  createTaskPath
+                }
                 className="mt-5 inline-flex h-10 items-center justify-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700"
               >
-                Create Risk
+                Create Task
               </Link>
             </div>
           ) : (
             <>
-              {/* =============================================
-                  DESKTOP TABLE
-                  ============================================= */}
+              {/* DESKTOP */}
 
               <div className="hidden w-full min-w-0 overflow-x-auto lg:block">
-                <table className="w-full min-w-[1320px] border-collapse">
+                <table className="w-full min-w-[980px] border-collapse">
                   <thead className="bg-gray-50 dark:bg-gray-950/50">
                     <tr>
                       <th className="w-24 px-4 py-4 text-left text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400">
                         Sr. No.
-                      </th>
-
-                      <th className="w-44 px-4 py-4 text-left text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400">
-                        Risk Register ID
                       </th>
 
                       <th className="w-48 px-4 py-4 text-left text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400">
@@ -1272,7 +1170,7 @@ export default function RisksPage() {
                       </th>
 
                       <th className="min-w-[380px] px-4 py-4 text-left text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400">
-                        Description
+                        Task Description
                       </th>
 
                       <th className="w-24 px-4 py-4 text-center text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400">
@@ -1283,7 +1181,7 @@ export default function RisksPage() {
                         After
                       </th>
 
-                      <th className="w-44 px-4 py-4 text-center text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400">
+                      <th className="w-40 px-4 py-4 text-center text-xs font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400">
                         Status
                       </th>
 
@@ -1294,34 +1192,34 @@ export default function RisksPage() {
                   </thead>
 
                   <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                    {risks.map(
-                      (risk) => {
+                    {tasks.map(
+                      (task) => {
                         const beforeCount =
-                          risk.evidenceSummary
+                          task.evidenceSummary
                             ?.beforeCount ??
                           0;
 
                         const afterCount =
-                          risk.evidenceSummary
+                          task.evidenceSummary
                             ?.afterCount ??
                           0;
 
                         const deleting =
-                          deletingRiskId ===
-                          risk._id;
+                          deletingTaskId ===
+                          task._id;
 
                         const projectReference =
-                          getRiskProjectReference(
-                            risk
+                          getTaskProjectReference(
+                            task
                           );
 
                         return (
                           <tr
                             key={
-                              risk._id
+                              task._id
                             }
                             className={`transition ${
-                              risk.status ===
+                              task.status ===
                               "complete"
                                 ? "bg-emerald-50/20 hover:bg-emerald-50/50 dark:bg-emerald-950/5 dark:hover:bg-emerald-950/15"
                                 : "hover:bg-gray-50/80 dark:hover:bg-white/[0.02]"
@@ -1329,32 +1227,10 @@ export default function RisksPage() {
                           >
                             <td className="px-4 py-5 align-top">
                               <span className="inline-flex min-w-12 items-center justify-center rounded-lg bg-gray-100 px-3 py-2 text-sm font-bold text-gray-800 dark:bg-gray-800 dark:text-gray-200">
-                                {
-                                  risk.serialNo
-                                }
-                              </span>
-                            </td>
-
-                            <td className="px-4 py-5 align-top">
-                              <Link
-                                to={`/risks/${risk._id}`}
-                                className="text-sm font-bold text-emerald-700 transition hover:text-emerald-800 dark:text-emerald-400"
-                              >
-                                {risk.riskRegisterId ||
-                                  `Risk #${risk.serialNo}`}
-                              </Link>
-
-                              <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
-                                {risk.riskRegisterId
-                                  ? "Optional project reference"
-                                  : "No ID assigned"}
-                              </p>
-
-                              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                                {formatDate(
-                                  risk.createdAt
+                                {getTaskSerialLabel(
+                                  task
                                 )}
-                              </p>
+                              </span>
                             </td>
 
                             <td className="px-4 py-5 align-top">
@@ -1366,13 +1242,18 @@ export default function RisksPage() {
 
                             <td className="min-w-0 px-4 py-5 align-top">
                               <Link
-                                to={`/risks/${risk._id}`}
-                                className="line-clamp-4 text-sm font-semibold leading-6 text-gray-900 transition hover:text-emerald-600 dark:text-white"
+                                to={`/tasks/${task._id}`}
+                                className="line-clamp-3 text-sm font-semibold leading-6 text-gray-800 transition hover:text-emerald-600 dark:text-gray-200"
                               >
-                                {
-                                  risk.description
-                                }
+                                {task.description}
                               </Link>
+
+                              <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
+                                Created{" "}
+                                {formatDate(
+                                  task.createdAt
+                                )}
+                              </p>
                             </td>
 
                             <td className="px-4 py-5 text-center align-top">
@@ -1394,9 +1275,9 @@ export default function RisksPage() {
                             </td>
 
                             <td className="px-4 py-5 text-center align-top">
-                              <RiskStatusBadge
+                              <TaskStatusBadge
                                 status={
-                                  risk.status
+                                  task.status
                                 }
                               />
                             </td>
@@ -1404,33 +1285,33 @@ export default function RisksPage() {
                             <td className="px-4 py-5 align-top">
                               <div className="flex items-center justify-center gap-2">
                                 <Link
-                                  to={`/risks/${risk._id}`}
-                                  title="View Risk"
-                                  className="inline-flex size-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-blue-900 dark:hover:bg-blue-950/30 dark:hover:text-blue-400"
+                                  to={`/tasks/${task._id}`}
+                                  title="View Task"
+                                  className="inline-flex size-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
                                 >
                                   <ViewIcon />
                                 </Link>
 
                                 <Link
-                                  to={`/risks/${risk._id}?mode=update`}
-                                  title="Update Risk"
-                                  className="inline-flex size-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 transition hover:border-amber-200 hover:bg-amber-50 hover:text-amber-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-amber-900 dark:hover:bg-amber-950/30 dark:hover:text-amber-400"
+                                  to={`/tasks/${task._id}?mode=update`}
+                                  title="Update Task"
+                                  className="inline-flex size-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 transition hover:border-amber-200 hover:bg-amber-50 hover:text-amber-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
                                 >
                                   <EditIcon />
                                 </Link>
 
                                 <button
                                   type="button"
-                                  title="Delete Risk"
+                                  title="Delete Task"
                                   disabled={
                                     deleting
                                   }
                                   onClick={() => {
-                                    void handleDeleteRisk(
-                                      risk
+                                    void handleDeleteTask(
+                                      task
                                     );
                                   }}
-                                  className="inline-flex size-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-red-900 dark:hover:bg-red-950/30 dark:hover:text-red-400"
+                                  className="inline-flex size-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
                                 >
                                   <span
                                     className={
@@ -1443,14 +1324,6 @@ export default function RisksPage() {
                                   </span>
                                 </button>
                               </div>
-
-                              <p className="mt-2 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400">
-                                {
-                                  STATUS_LABELS[
-                                    risk.status
-                                  ]
-                                }
-                              </p>
                             </td>
                           </tr>
                         );
@@ -1460,113 +1333,117 @@ export default function RisksPage() {
                 </table>
               </div>
 
-              {/* =============================================
-                  MOBILE CARDS
-                  ============================================= */}
+              {/* MOBILE */}
 
               <div className="divide-y divide-gray-200 dark:divide-gray-800 lg:hidden">
-                {risks.map(
-                  (risk) => {
+                {tasks.map(
+                  (task) => {
                     const beforeCount =
-                      risk.evidenceSummary
+                      task.evidenceSummary
                         ?.beforeCount ??
                       0;
 
                     const afterCount =
-                      risk.evidenceSummary
+                      task.evidenceSummary
                         ?.afterCount ??
                       0;
 
                     const deleting =
-                      deletingRiskId ===
-                      risk._id;
+                      deletingTaskId ===
+                      task._id;
 
                     return (
                       <article
                         key={
-                          risk._id
+                          task._id
                         }
                         className="p-5"
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="rounded-lg bg-gray-100 px-2.5 py-1 text-xs font-bold text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                                Sr. No.{" "}
-                                {
-                                  risk.serialNo
-                                }
-                              </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-lg bg-gray-100 px-2.5 py-1 text-xs font-bold text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                            Sr. No.{" "}
+                            {getTaskSerialLabel(
+                              task
+                            )}
+                          </span>
 
-                              <RiskStatusBadge
-                                status={
-                                  risk.status
-                                }
-                              />
-                            </div>
-
-                            <Link
-                              to={`/risks/${risk._id}`}
-                              className="mt-3 block text-base font-bold text-gray-900 dark:text-white"
-                            >
-                              {getRiskDisplayTitle(
-                                risk
-                              )}
-                            </Link>
-
-                            <p className="mt-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                              {getRiskProjectReference(
-                                risk
-                              ) ||
-                                "Reference unavailable"}
-                            </p>
-                          </div>
+                          <TaskStatusBadge
+                            status={
+                              task.status
+                            }
+                          />
                         </div>
 
-                        <p className="mt-4 line-clamp-5 text-sm leading-6 text-gray-700 dark:text-gray-300">
+                        <Link
+                          to={`/tasks/${task._id}`}
+                          className="mt-3 block text-sm font-bold text-emerald-700 dark:text-emerald-400"
+                        >
+                          {getTaskDisplayLabel(
+                            task
+                          )}
+                        </Link>
+
+                        <p className="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">
+                          {getTaskProjectReference(
+                            task
+                          ) ||
+                            "Reference unavailable"}
+                        </p>
+
+                        <p className="mt-4 text-sm leading-6 text-gray-700 dark:text-gray-300">
                           {
-                            risk.description
+                            task.description
                           }
                         </p>
 
-                        <div className="mt-4 flex flex-wrap items-center gap-3">
-                          <EvidenceCount
-                            count={
-                              beforeCount
-                            }
-                            label="Before Evidence"
-                          />
+                        <div className="mt-4 flex flex-wrap items-end gap-3">
+                          <div>
+                            <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                              Before
+                            </p>
 
-                          <EvidenceCount
-                            count={
-                              afterCount
-                            }
-                            label="After Evidence"
-                          />
+                            <EvidenceCount
+                              count={
+                                beforeCount
+                              }
+                              label="Before Evidence"
+                            />
+                          </div>
 
-                          <span className="text-xs text-gray-400">
+                          <div>
+                            <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                              After
+                            </p>
+
+                            <EvidenceCount
+                              count={
+                                afterCount
+                              }
+                              label="After Evidence"
+                            />
+                          </div>
+
+                          <span className="pb-2 text-xs text-gray-400">
                             {formatDate(
-                              risk.createdAt
+                              task.createdAt
                             )}
                           </span>
                         </div>
 
                         <div className="mt-4 flex items-center gap-2 border-t border-gray-100 pt-4 dark:border-gray-800">
                           <Link
-                            to={`/risks/${risk._id}`}
+                            to={`/tasks/${task._id}`}
                             className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 dark:border-gray-700 dark:text-gray-300"
                           >
                             <ViewIcon />
-
                             View
                           </Link>
 
                           <Link
-                            to={`/risks/${risk._id}?mode=update`}
+                            to={`/tasks/${task._id}?mode=update`}
                             className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 text-sm font-semibold text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-400"
                           >
                             <EditIcon />
-
                             Update
                           </Link>
 
@@ -1576,12 +1453,12 @@ export default function RisksPage() {
                               deleting
                             }
                             onClick={() => {
-                              void handleDeleteRisk(
-                                risk
+                              void handleDeleteTask(
+                                task
                               );
                             }}
                             className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-700 disabled:opacity-50 dark:border-red-900 dark:bg-red-950/30 dark:text-red-400"
-                            aria-label="Delete Risk"
+                            aria-label="Delete Task"
                           >
                             <DeleteIcon />
                           </button>
@@ -1594,22 +1471,17 @@ export default function RisksPage() {
             </>
           )}
 
-          {/* =================================================
-              PAGINATION
-              ================================================= */}
+          {/* PAGINATION */}
 
           {!loading &&
           totalRecords > 0 ? (
             <div className="flex flex-col gap-3 border-t border-gray-200 px-5 py-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between sm:px-6">
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 Page{" "}
-
                 <span className="font-bold text-gray-900 dark:text-white">
                   {page}
                 </span>
-
                 {" "}of{" "}
-
                 <span className="font-bold text-gray-900 dark:text-white">
                   {totalPages}
                 </span>

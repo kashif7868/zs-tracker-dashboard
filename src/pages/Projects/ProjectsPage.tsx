@@ -1,17 +1,25 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
   useState,
 } from "react";
 
 import { Link } from "react-router";
 
 import {
+  archiveProject,
+  completeProject,
+  getProjectDashboardStats,
   getProjectReferenceNumber,
   getProjects,
+  putProjectOnHold,
+  reopenProject,
+  resumeProject,
+  startProject,
   type Project,
+  type ProjectDashboardStats,
   type ProjectPriority,
+  type ProjectScheduleStatus,
   type ProjectStatus,
 } from "../../services/project/project.service";
 
@@ -28,6 +36,15 @@ type PriorityFilter = ProjectPriority | "";
    ========================================================= */
 
 const PAGE_LIMIT = 10;
+
+const EMPTY_PROJECT_STATS: ProjectDashboardStats = {
+  totalProjects: 0,
+  activeProjects: 0,
+  completedProjects: 0,
+  draftProjects: 0,
+  onHoldProjects: 0,
+  archivedProjects: 0,
+};
 
 const statusOptions: Array<{
   value: StatusFilter;
@@ -48,10 +65,6 @@ const statusOptions: Array<{
   {
     value: "on_hold",
     label: "On Hold",
-  },
-  {
-    value: "awaiting_verification",
-    label: "Awaiting Verification",
   },
   {
     value: "completed",
@@ -129,9 +142,6 @@ const formatStatus = (
     case "on_hold":
       return "On Hold";
 
-    case "awaiting_verification":
-      return "Awaiting Verification";
-
     case "completed":
       return "Completed";
 
@@ -140,6 +150,29 @@ const formatStatus = (
 
     default:
       return "Draft";
+  }
+};
+
+const formatScheduleStatus = (
+  status?: ProjectScheduleStatus
+): string => {
+  switch (status) {
+    case "not_started":
+      return "Not Started";
+    case "on_track":
+      return "On Track";
+    case "overdue":
+      return "Overdue";
+    case "completed_early":
+      return "Completed Early";
+    case "completed_on_time":
+      return "Completed On Time";
+    case "completed_late":
+      return "Completed Late";
+    case "archived":
+      return "Archived";
+    default:
+      return "On Track";
   }
 };
 
@@ -200,16 +233,6 @@ const getStatusClasses = (
         "dark:border-orange-500/20",
         "dark:bg-orange-500/10",
         "dark:text-orange-400",
-      ].join(" ");
-
-    case "awaiting_verification":
-      return [
-        "border-amber-200",
-        "bg-amber-50",
-        "text-amber-700",
-        "dark:border-amber-500/20",
-        "dark:bg-amber-500/10",
-        "dark:text-amber-400",
       ].join(" ");
 
     case "archived":
@@ -448,6 +471,14 @@ export default function ProjectsPage() {
   ] = useState<Project[]>([]);
 
   const [
+    dashboardStats,
+    setDashboardStats,
+  ] =
+    useState<ProjectDashboardStats>(
+      EMPTY_PROJECT_STATS
+    );
+
+  const [
     searchInput,
     setSearchInput,
   ] = useState("");
@@ -494,6 +525,11 @@ export default function ProjectsPage() {
     setErrorMessage,
   ] = useState("");
 
+  const [
+    lifecycleProjectId,
+    setLifecycleProjectId,
+  ] = useState<string | null>(null);
+
   /* =======================================================
      SEARCH DEBOUNCE
      ======================================================= */
@@ -534,34 +570,45 @@ export default function ProjectsPage() {
 
           setErrorMessage("");
 
-          const result =
-            await getProjects({
-              page,
+          const [
+            result,
+            stats,
+          ] =
+            await Promise.all([
+              getProjects({
+                page,
 
-              limit:
-                PAGE_LIMIT,
+                limit:
+                  PAGE_LIMIT,
 
-              search:
-                searchQuery ||
-                undefined,
+                search:
+                  searchQuery ||
+                  undefined,
 
-              status:
-                status ||
-                undefined,
+                status:
+                  status ||
+                  undefined,
 
-              priority:
-                priority ||
-                undefined,
+                priority:
+                  priority ||
+                  undefined,
 
-              sortBy:
-                "createdAt",
+                sortBy:
+                  "createdAt",
 
-              sortOrder:
-                "desc",
-            });
+                sortOrder:
+                  "desc",
+              }),
+
+              getProjectDashboardStats(),
+            ]);
 
           setProjects(
             result.projects
+          );
+
+          setDashboardStats(
+            stats
           );
 
           setTotalProjects(
@@ -578,6 +625,9 @@ export default function ProjectsPage() {
           );
 
           setProjects([]);
+          setDashboardStats(
+            EMPTY_PROJECT_STATS
+          );
           setTotalProjects(0);
           setTotalPages(0);
 
@@ -601,34 +651,99 @@ export default function ProjectsPage() {
   }, [fetchProjects]);
 
   /* =======================================================
-     CURRENT PAGE STATISTICS
+     PROJECT LIFECYCLE ACTIONS
      ======================================================= */
 
-  const visibleStats =
-    useMemo(() => {
-      return {
-        active:
-          projects.filter(
-            (project) =>
-              project.status ===
-              "active"
-          ).length,
+  const runLifecycleAction =
+    async (
+      project: Project,
+      action:
+        | "start"
+        | "hold"
+        | "resume"
+        | "complete"
+        | "reopen"
+        | "archive"
+    ) => {
+      const labels = {
+        start: "start",
+        hold: "put on hold",
+        resume: "resume",
+        complete: "mark as completed",
+        reopen: "reopen",
+        archive: "archive",
+      } as const;
 
-        completed:
-          projects.filter(
-            (project) =>
-              project.status ===
-              "completed"
-          ).length,
+      const confirmed =
+        window.confirm(
+          `Are you sure you want to ${labels[action]} "${project.title}"?`
+        );
 
-        critical:
-          projects.filter(
-            (project) =>
-              project.priority ===
-              "critical"
-          ).length,
-      };
-    }, [projects]);
+      if (!confirmed) {
+        return;
+      }
+
+      try {
+        setLifecycleProjectId(
+          project._id
+        );
+
+        setErrorMessage("");
+
+        switch (action) {
+          case "start":
+            await startProject(
+              project._id
+            );
+            break;
+
+          case "hold":
+            await putProjectOnHold(
+              project._id
+            );
+            break;
+
+          case "resume":
+            await resumeProject(
+              project._id
+            );
+            break;
+
+          case "complete":
+            await completeProject(
+              project._id
+            );
+            break;
+
+          case "reopen":
+            await reopenProject(
+              project._id
+            );
+            break;
+
+          case "archive":
+            await archiveProject(
+              project._id
+            );
+            break;
+        }
+
+        await fetchProjects(false);
+      } catch (error) {
+        console.error(
+          "Project lifecycle action failed:",
+          error
+        );
+
+        setErrorMessage(
+          "Project status update nahi ho saka. Backend response aur permissions check karein."
+        );
+      } finally {
+        setLifecycleProjectId(
+          null
+        );
+      }
+    };
 
   /* =======================================================
      FILTER HELPERS
@@ -711,37 +826,37 @@ export default function ProjectsPage() {
             </p>
 
             <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
-              {totalProjects}
+              {dashboardStats.totalProjects}
             </p>
           </div>
 
           <div className="p-5">
             <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
-              Active on Page
+              Active Projects
             </p>
 
             <p className="mt-2 text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-              {visibleStats.active}
+              {dashboardStats.activeProjects}
             </p>
           </div>
 
           <div className="p-5">
             <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
-              Completed on Page
+              Completed Projects
             </p>
 
             <p className="mt-2 text-2xl font-bold text-blue-600 dark:text-blue-400">
-              {visibleStats.completed}
+              {dashboardStats.completedProjects}
             </p>
           </div>
 
           <div className="p-5">
             <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
-              Critical on Page
+              On Hold Projects
             </p>
 
-            <p className="mt-2 text-2xl font-bold text-red-600 dark:text-red-400">
-              {visibleStats.critical}
+            <p className="mt-2 text-2xl font-bold text-orange-600 dark:text-orange-400">
+              {dashboardStats.onHoldProjects}
             </p>
           </div>
         </div>
@@ -1062,17 +1177,108 @@ export default function ProjectsPage() {
                                   )
                                 )}
                               </p>
+                              <p
+                                className={`mt-1 text-xs font-semibold ${
+                                  project.isOverdue
+                                    ? "text-red-600 dark:text-red-400"
+                                    : "text-gray-400"
+                                }`}
+                              >
+                                {formatScheduleStatus(
+                                  project.scheduleStatus
+                                )}
+                                {project.daysOverdue > 0
+                                  ? ` · ${project.daysOverdue} day${project.daysOverdue === 1 ? "" : "s"} overdue`
+                                  : ""}
+                              </p>
                             </td>
 
-                            <td className="px-5 py-4 text-right">
-                              <Link
-                                to={`/projects/${project._id}`}
-                                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
-                              >
-                                View
+                            <td className="px-5 py-4">
+                              <div className="flex min-w-[180px] flex-col items-end gap-2">
+                                <Link
+                                  to={`/projects/${project._id}`}
+                                  className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
+                                >
+                                  View
+                                  <ArrowIcon />
+                                </Link>
 
-                                <ArrowIcon />
-                              </Link>
+                                <div className="flex flex-wrap justify-end gap-1.5">
+                                  {project.status === "draft" ? (
+                                    <button
+                                      type="button"
+                                      disabled={lifecycleProjectId === project._id}
+                                      onClick={() => void runLifecycleAction(project, "start")}
+                                      className="rounded-lg border border-emerald-200 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 dark:border-emerald-500/20 dark:text-emerald-400"
+                                    >
+                                      Start
+                                    </button>
+                                  ) : null}
+
+                                  {project.status === "active" ? (
+                                    <>
+                                      <button
+                                        type="button"
+                                        disabled={lifecycleProjectId === project._id}
+                                        onClick={() => void runLifecycleAction(project, "hold")}
+                                        className="rounded-lg border border-orange-200 px-2.5 py-1.5 text-xs font-semibold text-orange-700 hover:bg-orange-50 disabled:opacity-50 dark:border-orange-500/20 dark:text-orange-400"
+                                      >
+                                        Hold
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={lifecycleProjectId === project._id}
+                                        onClick={() => void runLifecycleAction(project, "complete")}
+                                        className="rounded-lg border border-blue-200 px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50 dark:border-blue-500/20 dark:text-blue-400"
+                                      >
+                                        Complete
+                                      </button>
+                                    </>
+                                  ) : null}
+
+                                  {project.status === "on_hold" ? (
+                                    <>
+                                      <button
+                                        type="button"
+                                        disabled={lifecycleProjectId === project._id}
+                                        onClick={() => void runLifecycleAction(project, "resume")}
+                                        className="rounded-lg border border-emerald-200 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 dark:border-emerald-500/20 dark:text-emerald-400"
+                                      >
+                                        Resume
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={lifecycleProjectId === project._id}
+                                        onClick={() => void runLifecycleAction(project, "complete")}
+                                        className="rounded-lg border border-blue-200 px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50 dark:border-blue-500/20 dark:text-blue-400"
+                                      >
+                                        Complete
+                                      </button>
+                                    </>
+                                  ) : null}
+
+                                  {project.status === "completed" ? (
+                                    <>
+                                      <button
+                                        type="button"
+                                        disabled={lifecycleProjectId === project._id}
+                                        onClick={() => void runLifecycleAction(project, "reopen")}
+                                        className="rounded-lg border border-violet-200 px-2.5 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-50 disabled:opacity-50 dark:border-violet-500/20 dark:text-violet-400"
+                                      >
+                                        Reopen
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={lifecycleProjectId === project._id}
+                                        onClick={() => void runLifecycleAction(project, "archive")}
+                                        className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-400"
+                                      >
+                                        Archive
+                                      </button>
+                                    </>
+                                  ) : null}
+                                </div>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -1184,6 +1390,82 @@ export default function ProjectsPage() {
                               project.priority
                             )}
                           </span>
+                        </div>
+
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {project.status === "draft" ? (
+                            <button
+                              type="button"
+                              disabled={lifecycleProjectId === project._id}
+                              onClick={() => void runLifecycleAction(project, "start")}
+                              className="rounded-lg border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-700 disabled:opacity-50 dark:border-emerald-500/20 dark:text-emerald-400"
+                            >
+                              Start Project
+                            </button>
+                          ) : null}
+
+                          {project.status === "active" ? (
+                            <>
+                              <button
+                                type="button"
+                                disabled={lifecycleProjectId === project._id}
+                                onClick={() => void runLifecycleAction(project, "hold")}
+                                className="rounded-lg border border-orange-200 px-3 py-2 text-xs font-semibold text-orange-700 disabled:opacity-50 dark:border-orange-500/20 dark:text-orange-400"
+                              >
+                                Put On Hold
+                              </button>
+                              <button
+                                type="button"
+                                disabled={lifecycleProjectId === project._id}
+                                onClick={() => void runLifecycleAction(project, "complete")}
+                                className="rounded-lg border border-blue-200 px-3 py-2 text-xs font-semibold text-blue-700 disabled:opacity-50 dark:border-blue-500/20 dark:text-blue-400"
+                              >
+                                Mark Completed
+                              </button>
+                            </>
+                          ) : null}
+
+                          {project.status === "on_hold" ? (
+                            <>
+                              <button
+                                type="button"
+                                disabled={lifecycleProjectId === project._id}
+                                onClick={() => void runLifecycleAction(project, "resume")}
+                                className="rounded-lg border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-700 disabled:opacity-50 dark:border-emerald-500/20 dark:text-emerald-400"
+                              >
+                                Resume
+                              </button>
+                              <button
+                                type="button"
+                                disabled={lifecycleProjectId === project._id}
+                                onClick={() => void runLifecycleAction(project, "complete")}
+                                className="rounded-lg border border-blue-200 px-3 py-2 text-xs font-semibold text-blue-700 disabled:opacity-50 dark:border-blue-500/20 dark:text-blue-400"
+                              >
+                                Mark Completed
+                              </button>
+                            </>
+                          ) : null}
+
+                          {project.status === "completed" ? (
+                            <>
+                              <button
+                                type="button"
+                                disabled={lifecycleProjectId === project._id}
+                                onClick={() => void runLifecycleAction(project, "reopen")}
+                                className="rounded-lg border border-violet-200 px-3 py-2 text-xs font-semibold text-violet-700 disabled:opacity-50 dark:border-violet-500/20 dark:text-violet-400"
+                              >
+                                Reopen
+                              </button>
+                              <button
+                                type="button"
+                                disabled={lifecycleProjectId === project._id}
+                                onClick={() => void runLifecycleAction(project, "archive")}
+                                className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 disabled:opacity-50 dark:border-gray-700 dark:text-gray-400"
+                              >
+                                Archive
+                              </button>
+                            </>
+                          ) : null}
                         </div>
 
                         <div className="mt-4">

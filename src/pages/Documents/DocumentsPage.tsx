@@ -19,6 +19,12 @@ import {
 } from "../../services/project/project.service";
 
 import {
+  getTasksByProject,
+  getTaskSerialLabel,
+  type Task,
+} from "../../services/task_register/task.service";
+
+import {
   deleteDocument,
   formatDocumentFileSize,
   generateDocument,
@@ -30,7 +36,7 @@ import {
   saveDocumentDownload,
   type DocumentFormat,
   type DocumentLayout,
-  type DocumentRiskStatusFilter,
+  type DocumentTaskStatusFilter,
   type DocumentStatus,
   type ProjectDocumentRecord,
 } from "../../services/documents/document.service";
@@ -68,9 +74,8 @@ type GenerationFormState = {
   description: string;
   layout: DocumentLayout;
   format: DocumentFormat;
-  statusFilter: DocumentRiskStatusFilter;
+  statusFilter: DocumentTaskStatusFilter;
   includeProjectDetails: boolean;
-  includeRiskRegisterId: boolean;
   includeBeforeEvidence: boolean;
   includeAfterEvidence: boolean;
   includeEvidenceImages: boolean;
@@ -89,11 +94,10 @@ const INITIAL_GENERATION_FORM: GenerationFormState = {
   projectId: "",
   title: "",
   description: "",
-  layout: "risk_register",
+  layout: "task_register",
   format: "pdf",
   statusFilter: "all",
   includeProjectDetails: true,
-  includeRiskRegisterId: true,
   includeBeforeEvidence: true,
   includeAfterEvidence: true,
   includeEvidenceImages: true,
@@ -193,6 +197,24 @@ const GenerateIcon = () => (
     <path d="M5 21H19" />
     <path d="M5 17V21" />
     <path d="M19 17V21" />
+  </svg>
+);
+
+const CalendarIcon = () => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.9"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="size-4"
+    aria-hidden="true"
+  >
+    <path d="M7 3V6" />
+    <path d="M17 3V6" />
+    <path d="M4 9H20" />
+    <rect x="4" y="5" width="16" height="15" rx="2" />
   </svg>
 );
 
@@ -465,6 +487,68 @@ function CheckboxField({
   );
 }
 
+function DatePickerField({
+  id,
+  value,
+  disabled = false,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  disabled?: boolean;
+  onChange: (value: string) => void;
+}) {
+  const openCalendar = () => {
+    const input =
+      document.getElementById(
+        id
+      ) as HTMLInputElement | null;
+
+    if (!input || disabled) {
+      return;
+    }
+
+    if (
+      typeof input.showPicker ===
+      "function"
+    ) {
+      input.showPicker();
+      return;
+    }
+
+    input.focus();
+    input.click();
+  };
+
+  return (
+    <div className="relative">
+      <input
+        id={id}
+        type="date"
+        value={value}
+        disabled={disabled}
+        onChange={(event) =>
+          onChange(
+            event.target.value
+          )
+        }
+        className={`${INPUT_CLASSES} pr-12`}
+      />
+
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={openCalendar}
+        className="absolute right-1.5 top-1/2 inline-flex size-8 -translate-y-1/2 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-emerald-400"
+        aria-label="Open calendar"
+        title="Open calendar"
+      >
+        <CalendarIcon />
+      </button>
+    </div>
+  );
+}
+
 function LoadingHistory() {
   return (
     <div className="space-y-3 p-5">
@@ -489,6 +573,10 @@ export default function DocumentsPage() {
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
+
+  const [projectTasks, setProjectTasks] = useState<Task[]>([]);
+  const [tasksLoading, setTasksLoading] = useState(false);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
 
   const [selectedProjectId, setSelectedProjectId] = useState(
     requestedProjectId
@@ -606,8 +694,105 @@ export default function DocumentsPage() {
     [projects, generationForm.projectId]
   );
 
-  const riskRegisterIdAvailable =
-    generationProject?.settings?.riskRegisterIdEnabled === true;
+  /* =======================================================
+     LOAD TASK REGISTER FOR REPORT PREVIEW
+     ======================================================= */
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadProjectTasks = async () => {
+      const projectId =
+        generationForm.projectId.trim();
+
+      if (!projectId) {
+        setProjectTasks([]);
+        setSelectedTaskIds([]);
+        return;
+      }
+
+      try {
+        setTasksLoading(true);
+
+        const firstPage =
+          await getTasksByProject(
+            projectId,
+            {
+              page: 1,
+              limit: 100,
+              sortBy: "serialNo",
+              sortOrder: "asc",
+            }
+          );
+
+        const allTasks = [
+          ...firstPage.tasks,
+        ];
+
+        for (
+          let currentPage = 2;
+          currentPage <=
+          firstPage.pagination.totalPages;
+          currentPage += 1
+        ) {
+          const nextPage =
+            await getTasksByProject(
+              projectId,
+              {
+                page:
+                  currentPage,
+                limit:
+                  firstPage.pagination.limit,
+                sortBy:
+                  "serialNo",
+                sortOrder:
+                  "asc",
+              }
+            );
+
+          allTasks.push(
+            ...nextPage.tasks
+          );
+        }
+
+        if (cancelled) {
+          return;
+        }
+
+        setProjectTasks(
+          allTasks
+        );
+
+        setSelectedTaskIds(
+          allTasks.map(
+            (task) => task._id
+          )
+        );
+      } catch (requestError) {
+        if (!cancelled) {
+          setProjectTasks([]);
+          setSelectedTaskIds([]);
+          setError(
+            getErrorMessage(
+              requestError
+            )
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setTasksLoading(false);
+        }
+      }
+    };
+
+    void loadProjectTasks();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    generationForm.projectId,
+  ]);
 
   /* =======================================================
      LOAD DOCUMENTS
@@ -722,17 +907,21 @@ export default function DocumentsPage() {
      ======================================================= */
 
   const handleGenerationProjectChange = (projectId: string) => {
-    const project = projects.find((item) => item._id === projectId);
-    const riskRegisterEnabled =
-      project?.settings?.riskRegisterIdEnabled === true;
+    const project = projects.find(
+      (item) => item._id === projectId
+    );
 
     setGenerationForm((current) => ({
       ...current,
       projectId,
-      includeRiskRegisterId: riskRegisterEnabled
-        ? current.includeRiskRegisterId
-        : false,
+      title:
+        current.title.trim() ||
+        (project
+          ? `${getProjectDisplayName(project)} Task Register Report`
+          : ""),
     }));
+
+    setSelectedTaskIds([]);
   };
 
   const handleGenerateDocument = async (event: FormEvent<HTMLFormElement>) => {
@@ -749,11 +938,6 @@ export default function DocumentsPage() {
       return;
     }
 
-    if (title.length < 3) {
-      setError("Report title must contain at least 3 characters.");
-      return;
-    }
-
     if (
       generationForm.dateFrom &&
       generationForm.dateTo &&
@@ -766,9 +950,18 @@ export default function DocumentsPage() {
     try {
       setGenerating(true);
 
+      const defaultReportTitle =
+        generationProject
+          ? getProjectDisplayName(
+              generationProject
+            )
+          : "Project Report";
+
       const result = await generateDocument({
         projectId,
-        title,
+        title:
+          title ||
+          defaultReportTitle,
         ...(generationForm.description.trim()
           ? { description: generationForm.description.trim() }
           : {}),
@@ -777,21 +970,19 @@ export default function DocumentsPage() {
         filters: {
           statusFilter: generationForm.statusFilter,
           includeProjectDetails: generationForm.includeProjectDetails,
-          includeRiskRegisterId: riskRegisterIdAvailable
-            ? generationForm.includeRiskRegisterId
-            : false,
           includeBeforeEvidence: generationForm.includeBeforeEvidence,
           includeAfterEvidence: generationForm.includeAfterEvidence,
           includeEvidenceImages: generationForm.includeEvidenceImages,
           ...(generationForm.dateFrom ? { dateFrom: generationForm.dateFrom } : {}),
           ...(generationForm.dateTo ? { dateTo: generationForm.dateTo } : {}),
+          selectedTaskIds,
           sortBy: "serialNo",
           sortOrder: "asc",
         },
       });
 
       setSuccessMessage(
-        `${result.document.title} generated successfully. ${result.exportedRecords} Risk record${result.exportedRecords === 1 ? "" : "s"} exported.`
+        `${result.document.title} generated successfully. ${result.exportedRecords} Task${result.exportedRecords === 1 ? "" : "s"} exported.`
       );
 
       setSelectedProjectId(projectId);
@@ -842,7 +1033,7 @@ export default function DocumentsPage() {
 
   const handleDelete = async (document: ProjectDocumentRecord) => {
     const confirmed = window.confirm(
-      `Delete "${document.title}"?\n\nThe generated ${document.format.toUpperCase()} file and its report history record will be permanently deleted.\n\nOriginal Project, Risk and Evidence records will not be changed.`
+      `Delete "${document.title}"?\n\nThe generated ${document.format.toUpperCase()} file and its report history record will be permanently deleted.\n\nOriginal Project, Task and Evidence records will not be changed.`
     );
 
     if (!confirmed) {
@@ -881,7 +1072,7 @@ export default function DocumentsPage() {
     <>
       <PageMeta
         title="Documents & Reports | Project Tracker"
-        description="Generate and manage Project Tracker reports from Project, Risk Register and Evidence records."
+        description="Generate and manage Project Tracker reports from Project, Task Register and Evidence records."
       />
 
       <PageBreadcrumb pageTitle="Documents & Reports" />
@@ -905,7 +1096,7 @@ export default function DocumentsPage() {
               </h1>
 
               <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-500 dark:text-gray-400">
-                Generate PDF, DOCX and XLSX reports from Project, Risk Register
+                Generate PDF, DOCX and XLSX reports from Project, Task Register
                 and Evidence data, then manage generated report history.
               </p>
 
@@ -1016,8 +1207,8 @@ export default function DocumentsPage() {
                 </h2>
 
                 <p className="mt-1 text-sm leading-6 text-gray-500 dark:text-gray-400">
-                  Export existing Risk Register records without changing the
-                  underlying Project, Risk or Evidence data.
+                  Export existing Task Register records without changing the
+                  underlying Project, Task or Evidence data.
                 </p>
               </div>
             </div>
@@ -1083,7 +1274,7 @@ export default function DocumentsPage() {
                   }
                   className={INPUT_CLASSES}
                 >
-                  <option value="risk_register">Risk Register</option>
+                  <option value="task_register">Task Register</option>
                   <option value="detailed_evidence">Detailed Evidence</option>
                   <option value="summary">Summary</option>
                 </select>
@@ -1137,36 +1328,36 @@ export default function DocumentsPage() {
                       title: event.target.value,
                     }))
                   }
-                  placeholder="e.g. Electrical Safety Rectification Report"
+                  placeholder="Optional — leave blank to use the Project name"
                   className={INPUT_CLASSES}
                 />
 
                 <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                  Report title is fully customizable.
+                  Enter a custom title, or leave blank to use the selected Project name.
                 </p>
               </div>
 
               <div className="min-w-0">
                 <label
-                  htmlFor="risk-status-export"
+                  htmlFor="task-status-export"
                   className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400"
                 >
-                  Risk Status
+                  Task Status
                 </label>
 
                 <select
-                  id="risk-status-export"
+                  id="task-status-export"
                   value={generationForm.statusFilter}
                   disabled={generating}
                   onChange={(event) =>
                     setGenerationForm((current) => ({
                       ...current,
-                      statusFilter: event.target.value as DocumentRiskStatusFilter,
+                      statusFilter: event.target.value as DocumentTaskStatusFilter,
                     }))
                   }
                   className={INPUT_CLASSES}
                 >
-                  <option value="all">All Risks</option>
+                  <option value="all">All Tasks</option>
                   <option value="in_progress">In Progress Only</option>
                   <option value="complete">Complete Only</option>
                 </select>
@@ -1199,12 +1390,179 @@ export default function DocumentsPage() {
             </div>
 
             <div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                    Tasks Included in Report
+                  </h3>
+
+                  <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">
+                    Review the selected Project&apos;s Task Register before generating.
+                    All Tasks are selected by default.
+                  </p>
+                </div>
+
+                {projectTasks.length > 0 ? (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={generating || tasksLoading}
+                      onClick={() =>
+                        setSelectedTaskIds(
+                          projectTasks.map(
+                            (task) => task._id
+                          )
+                        )
+                      }
+                      className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 bg-white px-3 text-xs font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
+                    >
+                      Select All
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={generating || tasksLoading}
+                      onClick={() =>
+                        setSelectedTaskIds([])
+                      }
+                      className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 bg-white px-3 text-xs font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="mt-3 overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800">
+                {tasksLoading ? (
+                  <div className="p-5 text-sm text-gray-500 dark:text-gray-400">
+                    Loading Task Register...
+                  </div>
+                ) : !generationForm.projectId ? (
+                  <div className="p-5 text-sm text-gray-500 dark:text-gray-400">
+                    Select a Project to load its Tasks.
+                  </div>
+                ) : projectTasks.length === 0 ? (
+                  <div className="p-5 text-sm text-gray-500 dark:text-gray-400">
+                    No Tasks are available for this Project.
+                  </div>
+                ) : (
+                  <div className="max-h-[420px] overflow-auto">
+                    <table className="w-full min-w-[760px] text-left">
+                      <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-900">
+                        <tr className="border-b border-gray-200 text-[10px] font-bold uppercase tracking-wide text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                          <th className="w-14 px-4 py-3">Use</th>
+                          <th className="w-20 px-4 py-3">Sr.</th>
+                          <th className="px-4 py-3">Description</th>
+                          <th className="w-24 px-4 py-3 text-center">Before</th>
+                          <th className="w-24 px-4 py-3 text-center">After</th>
+                          <th className="w-32 px-4 py-3">Status</th>
+                        </tr>
+                      </thead>
+
+                      <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                        {projectTasks.map((task, index) => {
+                          const selected =
+                            selectedTaskIds.includes(
+                              task._id
+                            );
+
+                          return (
+                            <tr
+                              key={task._id}
+                              className={
+                                selected
+                                  ? "bg-emerald-50/30 dark:bg-emerald-500/[0.03]"
+                                  : ""
+                              }
+                            >
+                              <td className="px-4 py-3">
+                                <input
+                                  type="checkbox"
+                                  checked={selected}
+                                  disabled={generating}
+                                  onChange={(event) => {
+                                    const checked =
+                                      event.target.checked;
+
+                                    setSelectedTaskIds(
+                                      (current) =>
+                                        checked
+                                          ? [
+                                              ...new Set([
+                                                ...current,
+                                                task._id,
+                                              ]),
+                                            ]
+                                          : current.filter(
+                                              (taskId) =>
+                                                taskId !==
+                                                task._id
+                                            )
+                                    );
+                                  }}
+                                  className="size-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                                />
+                              </td>
+
+                              <td className="px-4 py-3 text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                {index + 1}
+                              </td>
+
+                              <td className="px-4 py-3">
+                                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                  {task.description || "—"}
+                                </p>
+
+                                <p className="mt-1 text-[10px] text-gray-400">
+                                  {getTaskSerialLabel(task)}
+                                </p>
+                              </td>
+
+                              <td className="px-4 py-3 text-center text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                {task.evidenceSummary?.beforeCount ?? 0}
+                              </td>
+
+                              <td className="px-4 py-3 text-center text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                {task.evidenceSummary?.afterCount ?? 0}
+                              </td>
+
+                              <td className="px-4 py-3">
+                                <span
+                                  className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                                    task.status === "complete"
+                                      ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400"
+                                      : "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400"
+                                  }`}
+                                >
+                                  {task.status === "complete"
+                                    ? "Complete"
+                                    : "In Progress"}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {projectTasks.length > 0 ? (
+                <p className="mt-2 text-xs font-medium text-gray-500 dark:text-gray-400">
+                  {selectedTaskIds.length} of {projectTasks.length} Tasks selected for export.
+                </p>
+              ) : null}
+            </div>
+
+            <div>
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                Risk Date Range
+                Task Date Range
               </h3>
 
               <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">
-                Optional. Leave both dates blank to include all matching Risk
+                Optional. Leave both dates blank to include all matching Task
                 records.
               </p>
 
@@ -1217,18 +1575,16 @@ export default function DocumentsPage() {
                     Date From
                   </label>
 
-                  <input
+                  <DatePickerField
                     id="report-date-from"
-                    type="date"
                     value={generationForm.dateFrom}
                     disabled={generating}
-                    onChange={(event) =>
+                    onChange={(value) =>
                       setGenerationForm((current) => ({
                         ...current,
-                        dateFrom: event.target.value,
+                        dateFrom: value,
                       }))
                     }
-                    className={INPUT_CLASSES}
                   />
                 </div>
 
@@ -1240,18 +1596,16 @@ export default function DocumentsPage() {
                     Date To
                   </label>
 
-                  <input
+                  <DatePickerField
                     id="report-date-to"
-                    type="date"
                     value={generationForm.dateTo}
                     disabled={generating}
-                    onChange={(event) =>
+                    onChange={(value) =>
                       setGenerationForm((current) => ({
                         ...current,
-                        dateTo: event.target.value,
+                        dateTo: value,
                       }))
                     }
-                    className={INPUT_CLASSES}
                   />
                 </div>
               </div>
@@ -1263,7 +1617,7 @@ export default function DocumentsPage() {
               </h3>
 
               <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">
-                Select the Project, Risk and Evidence content to include in the
+                Select the Project, Task and Evidence content to include in the
                 generated report.
               </p>
 
@@ -1278,26 +1632,6 @@ export default function DocumentsPage() {
                     setGenerationForm((current) => ({
                       ...current,
                       includeProjectDetails: checked,
-                    }))
-                  }
-                />
-
-                <CheckboxField
-                  id="include-risk-register-id"
-                  label="Risk Register ID"
-                  description={
-                    riskRegisterIdAvailable
-                      ? "Include optional Risk Register ID values."
-                      : "Risk Register ID is disabled in this Project."
-                  }
-                  checked={
-                    riskRegisterIdAvailable && generationForm.includeRiskRegisterId
-                  }
-                  disabled={generating || !riskRegisterIdAvailable}
-                  onChange={(checked) =>
-                    setGenerationForm((current) => ({
-                      ...current,
-                      includeRiskRegisterId: checked,
                     }))
                   }
                 />
@@ -1352,7 +1686,7 @@ export default function DocumentsPage() {
 
             <div className="flex flex-col gap-4 border-t border-gray-100 pt-5 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
               <p className="max-w-2xl text-xs leading-5 text-gray-500 dark:text-gray-400">
-                Risk Register remains the source of truth. Report generation
+                Task Register remains the source of truth. Report generation
                 only exports existing records and stores the generated file in
                 Documents history.
               </p>
@@ -1362,7 +1696,8 @@ export default function DocumentsPage() {
                 disabled={
                   generating ||
                   !generationForm.projectId ||
-                  generationForm.title.trim().length < 3
+                  selectedTaskIds.length === 0 ||
+                  tasksLoading
                 }
                 className="inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
               >
@@ -1500,7 +1835,7 @@ export default function DocumentsPage() {
                 className={INPUT_CLASSES}
               >
                 <option value="all">All Layouts</option>
-                <option value="risk_register">Risk Register</option>
+                <option value="task_register">Task Register</option>
                 <option value="detailed_evidence">Detailed Evidence</option>
                 <option value="summary">Summary</option>
               </select>
@@ -1640,8 +1975,8 @@ export default function DocumentsPage() {
                           {getDocumentLayoutLabel(document.layout)}
                         </p>
                         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                          {document.summary.totalRisks} Risk
-                          {document.summary.totalRisks === 1 ? "" : "s"} • {" "}
+                          {document.summary.totalTasks} Task
+                          {document.summary.totalTasks === 1 ? "" : "s"} • {" "}
                           {document.summary.completionPercentage}% complete
                         </p>
                         <p className="mt-1 break-all text-[10px] text-gray-400">

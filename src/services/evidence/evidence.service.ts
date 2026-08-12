@@ -1,16 +1,16 @@
 import api from "../api";
 
 import type {
-  RiskEvidence,
-  RiskEvidenceSummary,
-  RiskEvidenceType,
-  RiskStatus,
-} from "../risk/risk.service";
+  TaskEvidence,
+  TaskEvidenceSummary,
+  TaskEvidenceType,
+  TaskStatus,
+} from "../task_register/task.service";
 
 /* =========================================================
    UPLOAD CONFIGURATION
 
-   Backend configuration ke exact mutabiq:
+   Backend configuration:
 
    Field name: images
    Maximum files: 10
@@ -33,30 +33,36 @@ export const ALLOWED_EVIDENCE_IMAGE_TYPES = [
    EVIDENCE TYPES
    ========================================================= */
 
-export type Evidence = RiskEvidence;
+export type Evidence =
+  TaskEvidence;
 
 export type EvidenceType =
-  RiskEvidenceType;
+  TaskEvidenceType;
 
 export type EvidenceSummary =
-  RiskEvidenceSummary;
+  TaskEvidenceSummary;
 
 /* =========================================================
-   RISK RECORD RETURNED BY EVIDENCE API
+   TASK RECORD RETURNED BY EVIDENCE API
    ========================================================= */
 
-export type EvidenceRiskRecord = {
+export type EvidenceTaskRecord = {
   _id: string;
 
   projectId: string;
   projectCode: string;
 
-  serialNo: string;
-  riskRegisterId: string;
+  serialNo: number;
+
+  displaySrNo?: number;
+
+  taskRegisterId?: string;
 
   description: string;
 
-  status: RiskStatus;
+  status: TaskStatus;
+
+  completedAt?: string | null;
 
   createdAt?: string;
   updatedAt?: string;
@@ -67,11 +73,14 @@ export type EvidenceRiskRecord = {
    ========================================================= */
 
 export type EvidenceByTypeResult = {
-  evidenceType: EvidenceType;
+  evidenceType:
+    EvidenceType;
 
-  evidences: Evidence[];
+  evidences:
+    Evidence[];
 
-  count: number;
+  count:
+    number;
 };
 
 /* =========================================================
@@ -79,11 +88,14 @@ export type EvidenceByTypeResult = {
    ========================================================= */
 
 export type UploadEvidenceResult = {
-  risk: EvidenceRiskRecord;
+  task:
+    EvidenceTaskRecord;
 
-  uploadedEvidence: Evidence[];
+  uploadedEvidence:
+    Evidence[];
 
-  evidence: EvidenceSummary;
+  evidence:
+    EvidenceSummary;
 };
 
 /* =========================================================
@@ -91,13 +103,17 @@ export type UploadEvidenceResult = {
    ========================================================= */
 
 export type DeleteEvidenceResult = {
-  evidence: Evidence;
+  evidence:
+    Evidence;
 
-  risk: EvidenceRiskRecord;
+  task:
+    EvidenceTaskRecord;
 
-  evidenceSummary: EvidenceSummary;
+  evidenceSummary:
+    EvidenceSummary;
 
-  imageFileDeleted: boolean;
+  imageFileDeleted:
+    boolean;
 };
 
 /* =========================================================
@@ -105,16 +121,23 @@ export type DeleteEvidenceResult = {
    ========================================================= */
 
 export type DeleteEvidenceTypeResult = {
-  evidenceType: EvidenceType;
+  evidenceType:
+    EvidenceType;
 
-  deletedRecords: number;
+  deletedRecords:
+    number;
 
-  imageFilesRequested: number;
-  imageFilesDeleted: number;
+  imageFilesRequested:
+    number;
 
-  risk: EvidenceRiskRecord;
+  imageFilesDeleted:
+    number;
 
-  evidenceSummary: EvidenceSummary;
+  task:
+    EvidenceTaskRecord;
+
+  evidenceSummary:
+    EvidenceSummary;
 };
 
 /* =========================================================
@@ -144,13 +167,18 @@ const extractResponseData = <T>(
 
   if (
     responseBody &&
-    typeof responseBody === "object" &&
+    typeof responseBody ===
+      "object" &&
     "data" in responseBody
   ) {
     const envelope =
-      responseBody as ApiEnvelope<T>;
+      responseBody as
+        ApiEnvelope<T>;
 
-    if (envelope.data !== undefined) {
+    if (
+      envelope.data !==
+      undefined
+    ) {
       return envelope.data;
     }
   }
@@ -165,18 +193,30 @@ const extractResponseData = <T>(
 const normalizeString = (
   value: unknown
 ): string => {
-  return typeof value === "string"
+  return typeof value ===
+    "string"
     ? value
     : "";
+};
+
+const normalizeTrimmedString = (
+  value: unknown
+): string => {
+  return normalizeString(
+    value
+  ).trim();
 };
 
 const normalizeNumber = (
   value: unknown,
   fallback = 0
 ): number => {
-  const numberValue = Number(value);
+  const numberValue =
+    Number(value);
 
-  return Number.isFinite(numberValue)
+  return Number.isFinite(
+    numberValue
+  )
     ? numberValue
     : fallback;
 };
@@ -185,15 +225,17 @@ const normalizeBoolean = (
   value: unknown,
   fallback = false
 ): boolean => {
-  return typeof value === "boolean"
+  return typeof value ===
+    "boolean"
     ? value
     : fallback;
 };
 
-const normalizeRiskStatus = (
+const normalizeTaskStatus = (
   value: unknown
-): RiskStatus => {
-  return value === "complete"
+): TaskStatus => {
+  return value ===
+    "complete"
     ? "complete"
     : "in_progress";
 };
@@ -206,8 +248,22 @@ const normalizeEvidenceType = (
     : "before";
 };
 
+const encodePathValue = (
+  value: string
+): string => {
+  return encodeURIComponent(
+    value.trim()
+  );
+};
+
 /* =========================================================
    EVIDENCE NORMALIZER
+
+   Canonical Task Evidence response.
+
+   Existing old MongoDB records may still expose legacy
+   physical aliases from the backend model, so read
+   normalization remains backward-compatible.
    ========================================================= */
 
 const normalizeEvidence = (
@@ -215,35 +271,61 @@ const normalizeEvidence = (
 ): Evidence => {
   const evidence =
     rawEvidence &&
-    typeof rawEvidence === "object"
-      ? (rawEvidence as Partial<Evidence>)
+    typeof rawEvidence ===
+      "object"
+      ? rawEvidence as Record<
+          string,
+          unknown
+        >
       : {};
+
+  const taskId =
+    normalizeTrimmedString(
+      evidence.taskId
+    ) ||
+    normalizeTrimmedString(
+      evidence.riskId
+    );
+
+  const taskRegisterId =
+    normalizeTrimmedString(
+      evidence.taskRegisterId
+    ) ||
+    normalizeTrimmedString(
+      evidence.riskRegisterId
+    );
+
+  const projectCode =
+    normalizeTrimmedString(
+      evidence.projectCode
+    );
 
   return {
     _id:
-      normalizeString(
+      normalizeTrimmedString(
         evidence._id
       ),
 
     projectId:
-      normalizeString(
+      normalizeTrimmedString(
         evidence.projectId
       ),
 
-    projectCode:
-      normalizeString(
-        evidence.projectCode
-      ),
+    projectCode,
 
-    riskId:
-      normalizeString(
-        evidence.riskId
-      ),
+    projectReferenceNo:
+      normalizeTrimmedString(
+        evidence.projectReferenceNo
+      ) ||
+      projectCode,
 
-    riskRegisterId:
-      normalizeString(
-        evidence.riskRegisterId
-      ),
+    taskId,
+
+    ...(taskRegisterId
+      ? {
+          taskRegisterId,
+        }
+      : {}),
 
     evidenceType:
       normalizeEvidenceType(
@@ -251,17 +333,17 @@ const normalizeEvidence = (
       ),
 
     imagePath:
-      normalizeString(
+      normalizeTrimmedString(
         evidence.imagePath
       ),
 
     createdAt:
-      normalizeString(
+      normalizeTrimmedString(
         evidence.createdAt
       ),
 
     updatedAt:
-      normalizeString(
+      normalizeTrimmedString(
         evidence.updatedAt
       ),
   };
@@ -276,27 +358,27 @@ const normalizeEvidenceSummary = (
 ): EvidenceSummary => {
   const summary =
     rawSummary &&
-    typeof rawSummary === "object"
-      ? (rawSummary as {
-          before?: unknown[];
-          after?: unknown[];
-
-          beforeCount?: unknown;
-          afterCount?: unknown;
-
-          canMarkComplete?: unknown;
-        })
+    typeof rawSummary ===
+      "object"
+      ? rawSummary as Record<
+          string,
+          unknown
+        >
       : {};
 
   const before =
-    Array.isArray(summary.before)
+    Array.isArray(
+      summary.before
+    )
       ? summary.before.map(
           normalizeEvidence
         )
       : [];
 
   const after =
-    Array.isArray(summary.after)
+    Array.isArray(
+      summary.after
+    )
       ? summary.after.map(
           normalizeEvidence
         )
@@ -331,83 +413,115 @@ const normalizeEvidenceSummary = (
 };
 
 /* =========================================================
-   RISK NORMALIZER
+   TASK NORMALIZER
+
+   Backend compatibility:
+   task / risk
+   taskRegisterId / riskRegisterId
    ========================================================= */
 
-const normalizeEvidenceRisk = (
-  rawRisk: unknown
-): EvidenceRiskRecord => {
-  const risk =
-    rawRisk &&
-    typeof rawRisk === "object"
-      ? (rawRisk as Partial<EvidenceRiskRecord>)
+const normalizeEvidenceTask = (
+  rawTask: unknown
+): EvidenceTaskRecord => {
+  const task =
+    rawTask &&
+    typeof rawTask ===
+      "object"
+      ? rawTask as Record<
+          string,
+          unknown
+        >
       : {};
+
+  const taskRegisterId =
+    normalizeTrimmedString(
+      task.taskRegisterId
+    ) ||
+    normalizeTrimmedString(
+      task.riskRegisterId
+    );
 
   return {
     _id:
-      normalizeString(
-        risk._id
+      normalizeTrimmedString(
+        task._id
       ),
 
     projectId:
-      normalizeString(
-        risk.projectId
+      normalizeTrimmedString(
+        task.projectId
       ),
 
     projectCode:
-      normalizeString(
-        risk.projectCode
+      normalizeTrimmedString(
+        task.projectCode
       ),
 
     serialNo:
-      normalizeString(
-        risk.serialNo
+      normalizeNumber(
+        task.serialNo
       ),
 
-    riskRegisterId:
-      normalizeString(
-        risk.riskRegisterId
+    displaySrNo:
+      normalizeNumber(
+        task.displaySrNo,
+        normalizeNumber(
+          task.serialNo
+        )
       ),
+
+    ...(taskRegisterId
+      ? {
+          taskRegisterId,
+        }
+      : {}),
 
     description:
-      normalizeString(
-        risk.description
+      normalizeTrimmedString(
+        task.description
       ),
 
     status:
-      normalizeRiskStatus(
-        risk.status
+      normalizeTaskStatus(
+        task.status
       ),
 
+    completedAt:
+      normalizeTrimmedString(
+        task.completedAt
+      ) || null,
+
     createdAt:
-      normalizeString(
-        risk.createdAt
+      normalizeTrimmedString(
+        task.createdAt
       ),
 
     updatedAt:
-      normalizeString(
-        risk.updatedAt
+      normalizeTrimmedString(
+        task.updatedAt
       ),
   };
 };
 
 /* =========================================================
-   VALIDATE RISK ID
+   VALIDATE TASK ID
    ========================================================= */
 
-const validateRiskId = (
-  riskId: string
+const validateTaskId = (
+  taskId: string
 ): string => {
-  const normalizedRiskId =
-    riskId.trim();
+  const normalizedTaskId =
+    taskId.trim();
 
-  if (!normalizedRiskId) {
+  if (
+    !normalizedTaskId
+  ) {
     throw new Error(
-      "Risk ID is required."
+      "Task ID is required."
     );
   }
 
-  return normalizedRiskId;
+  return normalizedTaskId;
 };
 
 /* =========================================================
@@ -421,7 +535,8 @@ const validateEvidenceFiles = (
     Array.from(files);
 
   if (
-    normalizedFiles.length === 0
+    normalizedFiles.length ===
+    0
   ) {
     throw new Error(
       "At least one evidence image is required."
@@ -467,8 +582,6 @@ const validateEvidenceFiles = (
 /* =========================================================
    CREATE FORM DATA
 
-   Important:
-
    Content-Type manually set nahi karna.
    Browser multipart boundary khud generate karega.
    ========================================================= */
@@ -477,7 +590,9 @@ const createEvidenceFormData = (
   files: File[] | FileList
 ): FormData => {
   const validatedFiles =
-    validateEvidenceFiles(files);
+    validateEvidenceFiles(
+      files
+    );
 
   const formData =
     new FormData();
@@ -497,19 +612,24 @@ const createEvidenceFormData = (
 /* =========================================================
    GET ALL BEFORE AND AFTER EVIDENCE
 
-   GET /evidences/risk/:riskId
+   GET /evidences/task/:taskId
    ========================================================= */
 
-export const getRiskEvidences =
+export const getTaskEvidences =
   async (
-    riskId: string
+    taskId: string
   ): Promise<EvidenceSummary> => {
-    const normalizedRiskId =
-      validateRiskId(riskId);
+    const normalizedTaskId =
+      validateTaskId(
+        taskId
+      );
 
-    const response = await api.get(
-      `/evidences/risk/${normalizedRiskId}`
-    );
+    const response =
+      await api.get(
+        `/evidences/task/${encodePathValue(
+          normalizedTaskId
+        )}`
+      );
 
     const data =
       extractResponseData<
@@ -521,7 +641,8 @@ export const getRiskEvidences =
 
     if (
       data &&
-      typeof data === "object" &&
+      typeof data ===
+        "object" &&
       "evidence" in data
     ) {
       return normalizeEvidenceSummary(
@@ -544,15 +665,21 @@ export const getRiskEvidences =
 
 const getEvidenceByType =
   async (
-    riskId: string,
-    evidenceType: EvidenceType
+    taskId: string,
+    evidenceType:
+      EvidenceType
   ): Promise<EvidenceByTypeResult> => {
-    const normalizedRiskId =
-      validateRiskId(riskId);
+    const normalizedTaskId =
+      validateTaskId(
+        taskId
+      );
 
-    const response = await api.get(
-      `/evidences/risk/${normalizedRiskId}/${evidenceType}`
-    );
+    const response =
+      await api.get(
+        `/evidences/task/${encodePathValue(
+          normalizedTaskId
+        )}/${evidenceType}`
+      );
 
     const data =
       extractResponseData<{
@@ -562,7 +689,9 @@ const getEvidenceByType =
       }>(response);
 
     const evidences =
-      Array.isArray(data?.evidences)
+      Array.isArray(
+        data?.evidences
+      )
         ? data.evidences.map(
             normalizeEvidence
           )
@@ -587,40 +716,34 @@ const getEvidenceByType =
 
 /* =========================================================
    GET BEFORE EVIDENCE
-
-   GET /evidences/risk/:riskId/before
    ========================================================= */
 
 export const getBeforeEvidences =
   async (
-    riskId: string
+    taskId: string
   ): Promise<EvidenceByTypeResult> => {
     return getEvidenceByType(
-      riskId,
+      taskId,
       "before"
     );
   };
 
 /* =========================================================
    GET AFTER EVIDENCE
-
-   GET /evidences/risk/:riskId/after
    ========================================================= */
 
 export const getAfterEvidences =
   async (
-    riskId: string
+    taskId: string
   ): Promise<EvidenceByTypeResult> => {
     return getEvidenceByType(
-      riskId,
+      taskId,
       "after"
     );
   };
 
 /* =========================================================
    GET SINGLE EVIDENCE
-
-   GET /evidences/:evidenceId
    ========================================================= */
 
 export const getEvidenceById =
@@ -630,15 +753,20 @@ export const getEvidenceById =
     const normalizedEvidenceId =
       evidenceId.trim();
 
-    if (!normalizedEvidenceId) {
+    if (
+      !normalizedEvidenceId
+    ) {
       throw new Error(
         "Evidence ID is required."
       );
     }
 
-    const response = await api.get(
-      `/evidences/${normalizedEvidenceId}`
-    );
+    const response =
+      await api.get(
+        `/evidences/${encodePathValue(
+          normalizedEvidenceId
+        )}`
+      );
 
     const data =
       extractResponseData<
@@ -650,7 +778,8 @@ export const getEvidenceById =
 
     if (
       data &&
-      typeof data === "object" &&
+      typeof data ===
+        "object" &&
       "evidence" in data
     ) {
       return normalizeEvidence(
@@ -662,7 +791,9 @@ export const getEvidenceById =
       );
     }
 
-    return normalizeEvidence(data);
+    return normalizeEvidence(
+      data
+    );
   };
 
 /* =========================================================
@@ -671,24 +802,33 @@ export const getEvidenceById =
 
 const uploadEvidence =
   async (
-    riskId: string,
-    evidenceType: EvidenceType,
-    files: File[] | FileList
+    taskId: string,
+    evidenceType:
+      EvidenceType,
+    files:
+      File[] | FileList
   ): Promise<UploadEvidenceResult> => {
-    const normalizedRiskId =
-      validateRiskId(riskId);
+    const normalizedTaskId =
+      validateTaskId(
+        taskId
+      );
 
     const formData =
-      createEvidenceFormData(files);
+      createEvidenceFormData(
+        files
+      );
 
-    const response = await api.post(
-      `/evidences/risk/${normalizedRiskId}/${evidenceType}`,
-      formData
-    );
+    const response =
+      await api.post(
+        `/evidences/task/${encodePathValue(
+          normalizedTaskId
+        )}/${evidenceType}`,
+        formData
+      );
 
     const data =
       extractResponseData<{
-        risk?: unknown;
+        task?: unknown;
 
         uploadedEvidence?: unknown[];
 
@@ -696,9 +836,9 @@ const uploadEvidence =
       }>(response);
 
     return {
-      risk:
-        normalizeEvidenceRisk(
-          data?.risk
+      task:
+        normalizeEvidenceTask(
+          data?.task
         ),
 
       uploadedEvidence:
@@ -719,17 +859,16 @@ const uploadEvidence =
 
 /* =========================================================
    UPLOAD BEFORE EVIDENCE
-
-   POST /evidences/risk/:riskId/before
    ========================================================= */
 
 export const uploadBeforeEvidence =
   async (
-    riskId: string,
-    files: File[] | FileList
+    taskId: string,
+    files:
+      File[] | FileList
   ): Promise<UploadEvidenceResult> => {
     return uploadEvidence(
-      riskId,
+      taskId,
       "before",
       files
     );
@@ -737,17 +876,16 @@ export const uploadBeforeEvidence =
 
 /* =========================================================
    UPLOAD AFTER EVIDENCE
-
-   POST /evidences/risk/:riskId/after
    ========================================================= */
 
 export const uploadAfterEvidence =
   async (
-    riskId: string,
-    files: File[] | FileList
+    taskId: string,
+    files:
+      File[] | FileList
   ): Promise<UploadEvidenceResult> => {
     return uploadEvidence(
-      riskId,
+      taskId,
       "after",
       files
     );
@@ -756,36 +894,47 @@ export const uploadAfterEvidence =
 /* =========================================================
    DELETE SINGLE EVIDENCE
 
-   DELETE
-   /evidences/risk/:riskId/:evidenceId
+   DELETE /evidences/task/:taskId/:evidenceId
    ========================================================= */
 
 export const deleteEvidence =
   async (
-    riskId: string,
+    taskId: string,
     evidenceId: string
   ): Promise<DeleteEvidenceResult> => {
-    const normalizedRiskId =
-      validateRiskId(riskId);
+    const normalizedTaskId =
+      validateTaskId(
+        taskId
+      );
 
     const normalizedEvidenceId =
       evidenceId.trim();
 
-    if (!normalizedEvidenceId) {
+    if (
+      !normalizedEvidenceId
+    ) {
       throw new Error(
         "Evidence ID is required."
       );
     }
 
-    const response = await api.delete(
-      `/evidences/risk/${normalizedRiskId}/${normalizedEvidenceId}`
-    );
+    const response =
+      await api.delete(
+        `/evidences/task/${encodePathValue(
+          normalizedTaskId
+        )}/${encodePathValue(
+          normalizedEvidenceId
+        )}`
+      );
 
     const data =
       extractResponseData<{
         evidence?: unknown;
-        risk?: unknown;
+
+        task?: unknown;
+
         evidenceSummary?: unknown;
+
         imageFileDeleted?: unknown;
       }>(response);
 
@@ -795,9 +944,9 @@ export const deleteEvidence =
           data?.evidence
         ),
 
-      risk:
-        normalizeEvidenceRisk(
-          data?.risk
+      task:
+        normalizeEvidenceTask(
+          data?.task
         ),
 
       evidenceSummary:
@@ -818,15 +967,21 @@ export const deleteEvidence =
 
 const deleteEvidenceByType =
   async (
-    riskId: string,
-    evidenceType: EvidenceType
+    taskId: string,
+    evidenceType:
+      EvidenceType
   ): Promise<DeleteEvidenceTypeResult> => {
-    const normalizedRiskId =
-      validateRiskId(riskId);
+    const normalizedTaskId =
+      validateTaskId(
+        taskId
+      );
 
-    const response = await api.delete(
-      `/evidences/risk/${normalizedRiskId}/${evidenceType}`
-    );
+    const response =
+      await api.delete(
+        `/evidences/task/${encodePathValue(
+          normalizedTaskId
+        )}/${evidenceType}`
+      );
 
     const data =
       extractResponseData<{
@@ -837,7 +992,7 @@ const deleteEvidenceByType =
         imageFilesRequested?: unknown;
         imageFilesDeleted?: unknown;
 
-        risk?: unknown;
+        task?: unknown;
 
         evidenceSummary?: unknown;
       }>(response);
@@ -864,9 +1019,9 @@ const deleteEvidenceByType =
           data?.imageFilesDeleted
         ),
 
-      risk:
-        normalizeEvidenceRisk(
-          data?.risk
+      task:
+        normalizeEvidenceTask(
+          data?.task
         ),
 
       evidenceSummary:
@@ -878,32 +1033,28 @@ const deleteEvidenceByType =
 
 /* =========================================================
    DELETE ALL BEFORE EVIDENCE
-
-   DELETE /evidences/risk/:riskId/before
    ========================================================= */
 
 export const deleteBeforeEvidences =
   async (
-    riskId: string
+    taskId: string
   ): Promise<DeleteEvidenceTypeResult> => {
     return deleteEvidenceByType(
-      riskId,
+      taskId,
       "before"
     );
   };
 
 /* =========================================================
    DELETE ALL AFTER EVIDENCE
-
-   DELETE /evidences/risk/:riskId/after
    ========================================================= */
 
 export const deleteAfterEvidences =
   async (
-    riskId: string
+    taskId: string
   ): Promise<DeleteEvidenceTypeResult> => {
     return deleteEvidenceByType(
-      riskId,
+      taskId,
       "after"
     );
   };
@@ -911,13 +1062,13 @@ export const deleteAfterEvidences =
 /* =========================================================
    BUILD PUBLIC IMAGE URL
 
-   Database path:
+   Canonical new database paths:
 
-   /uploads/risks/before/image.jpg
+   /uploads/tasks/before/image.jpg
+   /uploads/tasks/after/image.jpg
 
-   Full URL:
-
-   http://localhost:5000/uploads/risks/before/image.jpg
+   Existing legacy image paths are still rendered so old
+   Evidence records do not lose their images.
    ========================================================= */
 
 export const getEvidenceImageUrl = (
@@ -926,7 +1077,9 @@ export const getEvidenceImageUrl = (
   const normalizedPath =
     imagePath.trim();
 
-  if (!normalizedPath) {
+  if (
+    !normalizedPath
+  ) {
     return "";
   }
 
@@ -942,16 +1095,22 @@ export const getEvidenceImageUrl = (
   }
 
   const publicPath =
-    normalizedPath.startsWith("/")
+    normalizedPath.startsWith(
+      "/"
+    )
       ? normalizedPath
       : `/${normalizedPath}`;
 
   const apiBaseUrl =
     String(
-      api.defaults.baseURL ?? ""
+      api.defaults.baseURL ??
+        ""
     )
       .trim()
-      .replace(/\/+$/, "");
+      .replace(
+        /\/+$/,
+        ""
+      );
 
   const serverBaseUrl =
     apiBaseUrl.replace(

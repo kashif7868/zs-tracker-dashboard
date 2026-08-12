@@ -1,24 +1,30 @@
 import api from "../api";
 
 /* =========================================================
-   RISK STATUS
+   TASK REGISTER STATUS
+
+   Current lifecycle:
+   in_progress <-> complete
    ========================================================= */
 
-export const RISK_STATUSES = [
+export const TASK_STATUSES = [
   "in_progress",
   "complete",
 ] as const;
 
-export type RiskStatus =
-  (typeof RISK_STATUSES)[number];
+export type TaskStatus =
+  (typeof TASK_STATUSES)[number];
 
 /* =========================================================
    SORTING
+
+   Keep only fields supported by the current backend Task
+   service.
    ========================================================= */
 
-export const RISK_SORT_FIELDS = [
+export const TASK_SORT_FIELDS = [
   "serialNo",
-  "riskRegisterId",
+  "taskRegisterId",
   "projectCode",
   "description",
   "status",
@@ -26,36 +32,30 @@ export const RISK_SORT_FIELDS = [
   "updatedAt",
 ] as const;
 
-export type RiskSortField =
-  (typeof RISK_SORT_FIELDS)[number];
+export type TaskSortField =
+  (typeof TASK_SORT_FIELDS)[number];
 
 /* =========================================================
    EVIDENCE TYPES
    ========================================================= */
 
-export type RiskEvidenceType =
+export type TaskEvidenceType =
   | "before"
   | "after";
 
-export type RiskEvidence = {
+export type TaskEvidence = {
   _id: string;
 
   projectId: string;
 
-  /*
-    Backend database field projectCode hai.
-
-    Frontend par isay Project Reference Number ke label
-    ke saath display kiya jayega.
-  */
   projectCode: string;
   projectReferenceNo?: string;
 
-  riskId: string;
+  taskId: string;
 
-  riskRegisterId?: string;
+  taskRegisterId?: string;
 
-  evidenceType: RiskEvidenceType;
+  evidenceType: TaskEvidenceType;
 
   imagePath: string;
 
@@ -63,9 +63,9 @@ export type RiskEvidence = {
   updatedAt: string;
 };
 
-export type RiskEvidenceSummary = {
-  before: RiskEvidence[];
-  after: RiskEvidence[];
+export type TaskEvidenceSummary = {
+  before: TaskEvidence[];
+  after: TaskEvidence[];
 
   beforeCount: number;
   afterCount: number;
@@ -74,20 +74,22 @@ export type RiskEvidenceSummary = {
 };
 
 /* =========================================================
-   MAIN RISK TYPE
+   MAIN TASK TYPE
 
    serialNo:
-   Project-wise automatically generated number.
+   Stable backend project-wise number.
 
-   riskRegisterId:
-   Optional field.
-   Project setting se availability control hogi.
+   displaySrNo:
+   Continuous UI sequence. This is what the list should show.
 
-   description:
-   Complete finding, issue aur effect isi field mein rahega.
+   taskRegisterId:
+   Optional. Project setting controls whether it is used.
+
+   No title, category, priority, assignedTo, startDate,
+   dueDate, pending or on_hold fields are used.
    ========================================================= */
 
-export type Risk = {
+export type Task = {
   _id: string;
 
   projectId: string;
@@ -96,81 +98,77 @@ export type Risk = {
   projectReferenceNo?: string;
 
   serialNo: number;
+  displaySrNo?: number;
 
-  riskRegisterId?: string;
+  taskRegisterId?: string;
 
   description: string;
 
-  status: RiskStatus;
+  status: TaskStatus;
+
+  completedAt?: string | null;
 
   createdAt: string;
   updatedAt: string;
 
-  evidenceSummary?: RiskEvidenceSummary;
+  evidenceSummary?: TaskEvidenceSummary;
 };
 
 /* =========================================================
    CREATE PAYLOAD
 
-   Frontend API ko sirf yeh fields bhejega:
-
+   User enters:
    projectId
    description
-   riskRegisterId optional
+   taskRegisterId optional
 
-   serialNo automatically generate hoga.
-   status automatically in_progress hoga.
+   Backend automatically handles:
+   serialNo
+   status
+   timestamps
    ========================================================= */
 
-export type CreateRiskPayload = {
+export type CreateTaskPayload = {
   projectId: string;
 
   description: string;
 
-  riskRegisterId?: string;
+  taskRegisterId?: string;
 };
 
 /* =========================================================
    UPDATE PAYLOAD
-
-   Editable fields:
-
-   description
-   riskRegisterId optional
-
-   Blank/null riskRegisterId existing value remove karega,
-   provided Project Settings mein field enabled ho.
    ========================================================= */
 
-export type UpdateRiskPayload = {
+export type UpdateTaskPayload = {
   description?: string;
 
-  riskRegisterId?: string | null;
+  taskRegisterId?: string | null;
 };
 
 /* =========================================================
    STATUS PAYLOAD
    ========================================================= */
 
-export type UpdateRiskStatusPayload = {
-  status: RiskStatus;
+export type UpdateTaskStatusPayload = {
+  status: TaskStatus;
 };
 
 /* =========================================================
    QUERY PARAMETERS
    ========================================================= */
 
-export type RiskListParams = {
+export type TaskListParams = {
   projectId?: string;
 
-  status?: RiskStatus | "";
+  status?: TaskStatus | "";
 
   search?: string;
 
   page?: number;
   limit?: number;
 
-  sortBy?: RiskSortField;
+  sortBy?: TaskSortField;
   sortOrder?: "asc" | "desc";
 };
 
@@ -178,7 +176,7 @@ export type RiskListParams = {
    PAGINATION
    ========================================================= */
 
-export type RiskPagination = {
+export type TaskPagination = {
   page: number;
   limit: number;
 
@@ -191,30 +189,30 @@ export type RiskPagination = {
   hasPreviousPage: boolean;
 };
 
-export type RiskListResult = {
-  risks: Risk[];
+export type TaskListResult = {
+  tasks: Task[];
 
-  pagination: RiskPagination;
+  pagination: TaskPagination;
 };
 
 /* =========================================================
-   SINGLE RISK DETAILS
+   SINGLE TASK DETAILS
    ========================================================= */
 
-export type RiskDetailsResult = {
-  risk: Risk;
+export type TaskDetailsResult = {
+  task: Task;
 
-  evidence: RiskEvidenceSummary;
+  evidence: TaskEvidenceSummary;
 };
 
 /* =========================================================
    DELETE RESULT
    ========================================================= */
 
-export type DeleteRiskResult = {
-  riskId?: string;
+export type DeleteTaskResult = {
+  taskId?: string;
 
-  risk?: Risk;
+  task?: Task;
 
   deletedEvidenceCount?: number;
 
@@ -230,12 +228,11 @@ export type DeleteRiskResult = {
    DASHBOARD SUMMARY
    ========================================================= */
 
-export type RiskDashboardSummary = {
-  totalRisks: number;
+export type TaskDashboardSummary = {
+  totalTasks: number;
 
-  inProgressRisks: number;
-
-  completeRisks: number;
+  inProgressTasks: number;
+  completeTasks: number;
 
   completionPercentage: number;
 };
@@ -246,19 +243,28 @@ export type RiskDashboardSummary = {
 
 type ApiEnvelope<T> = {
   success?: boolean;
-
   message?: string;
-
   data?: T;
 };
 
-type RawRiskListData = {
+type RawTaskListData = {
+  tasks?: unknown[];
+
+  /*
+    Temporary backend compatibility.
+    Old service response may still contain risks.
+  */
   risks?: unknown[];
 
   pagination?: unknown;
 };
 
-type RawRiskDetailsData = {
+type RawTaskDetailsData = {
+  task?: unknown;
+
+  /*
+    Temporary backend compatibility.
+  */
   risk?: unknown;
 
   evidence?: unknown;
@@ -271,28 +277,25 @@ type RawRiskDetailsData = {
 const hasOwnField = (
   object: object,
   field: PropertyKey
-): boolean => {
-  return Object.prototype.hasOwnProperty.call(
+): boolean =>
+  Object.prototype.hasOwnProperty.call(
     object,
     field
   );
-};
 
 const normalizeString = (
   value: unknown
-): string => {
-  return typeof value === "string"
+): string =>
+  typeof value === "string"
     ? value
     : "";
-};
 
 const normalizeTrimmedString = (
   value: unknown
-): string => {
-  return normalizeString(
+): string =>
+  normalizeString(
     value
   ).trim();
-};
 
 const normalizeNumber = (
   value: unknown,
@@ -311,36 +314,30 @@ const normalizeNumber = (
 const normalizeNonNegativeInteger = (
   value: unknown,
   fallback = 0
-): number => {
-  const numberValue =
-    normalizeNumber(
-      value,
-      fallback
-    );
-
-  return Math.max(
+): number =>
+  Math.max(
     Math.trunc(
-      numberValue
+      normalizeNumber(
+        value,
+        fallback
+      )
     ),
     0
   );
-};
 
-const normalizeRiskStatus = (
+const normalizeTaskStatus = (
   value: unknown
-): RiskStatus => {
-  return value === "complete"
+): TaskStatus =>
+  value === "complete"
     ? "complete"
     : "in_progress";
-};
 
 const encodePathValue = (
   value: string
-): string => {
-  return encodeURIComponent(
+): string =>
+  encodeURIComponent(
     value.trim()
   );
-};
 
 /* =========================================================
    RESPONSE DATA EXTRACTOR
@@ -379,18 +376,22 @@ const extractResponseData = <T>(
 
 /* =========================================================
    EVIDENCE NORMALIZER
+
+   Accepts both canonical task fields and temporary legacy
+   risk fields while backend migration is being completed.
    ========================================================= */
 
 const normalizeEvidenceRecord = (
   rawEvidence: unknown
-): RiskEvidence => {
+): TaskEvidence => {
   const evidence =
     rawEvidence &&
     typeof rawEvidence ===
       "object"
-      ? (
-          rawEvidence as Partial<RiskEvidence>
-        )
+      ? rawEvidence as Record<
+          string,
+          unknown
+        >
       : {};
 
   const projectCode =
@@ -403,7 +404,18 @@ const normalizeEvidenceRecord = (
       evidence.projectReferenceNo
     ) || projectCode;
 
-  const riskRegisterId =
+  const taskId =
+    normalizeTrimmedString(
+      evidence.taskId
+    ) ||
+    normalizeTrimmedString(
+      evidence.riskId
+    );
+
+  const taskRegisterId =
+    normalizeTrimmedString(
+      evidence.taskRegisterId
+    ) ||
     normalizeTrimmedString(
       evidence.riskRegisterId
     );
@@ -423,14 +435,11 @@ const normalizeEvidenceRecord = (
 
     projectReferenceNo,
 
-    riskId:
-      normalizeTrimmedString(
-        evidence.riskId
-      ),
+    taskId,
 
-    ...(riskRegisterId
+    ...(taskRegisterId
       ? {
-          riskRegisterId,
+          taskRegisterId,
         }
       : {}),
 
@@ -463,22 +472,15 @@ const normalizeEvidenceRecord = (
 
 const normalizeEvidenceSummary = (
   rawEvidence?: unknown
-): RiskEvidenceSummary => {
+): TaskEvidenceSummary => {
   const evidence =
     rawEvidence &&
     typeof rawEvidence ===
       "object"
-      ? (
-          rawEvidence as {
-            before?: unknown[];
-            after?: unknown[];
-
-            beforeCount?: unknown;
-            afterCount?: unknown;
-
-            canMarkComplete?: unknown;
-          }
-        )
+      ? rawEvidence as Record<
+          string,
+          unknown
+        >
       : {};
 
   const before =
@@ -512,7 +514,8 @@ const normalizeEvidenceSummary = (
     );
 
   const canMarkComplete =
-    typeof evidence.canMarkComplete ===
+    typeof evidence
+      .canMarkComplete ===
     "boolean"
       ? evidence.canMarkComplete
       : beforeCount > 0 &&
@@ -530,101 +533,113 @@ const normalizeEvidenceSummary = (
 };
 
 /* =========================================================
-   RISK NORMALIZER
+   TASK NORMALIZER
    ========================================================= */
 
-const normalizeRisk = (
-  rawRisk: unknown
-): Risk => {
-  const risk =
-    rawRisk &&
-    typeof rawRisk ===
+const normalizeTask = (
+  rawTask: unknown
+): Task => {
+  const task =
+    rawTask &&
+    typeof rawTask ===
       "object"
-      ? (
-          rawRisk as Partial<Risk> & {
-            evidence?: unknown;
-
-            beforeCount?: unknown;
-            afterCount?: unknown;
-
-            canMarkComplete?: unknown;
-          }
-        )
+      ? rawTask as Record<
+          string,
+          unknown
+        >
       : {};
 
   const projectCode =
     normalizeTrimmedString(
-      risk.projectCode
+      task.projectCode
     );
 
   const projectReferenceNo =
     normalizeTrimmedString(
-      risk.projectReferenceNo
+      task.projectReferenceNo
     ) || projectCode;
 
-  const riskRegisterId =
+  const taskRegisterId =
     normalizeTrimmedString(
-      risk.riskRegisterId
+      task.taskRegisterId
+    ) ||
+    normalizeTrimmedString(
+      task.riskRegisterId
+    );
+
+  const serialNo =
+    normalizeNonNegativeInteger(
+      task.serialNo
+    );
+
+  const displaySrNo =
+    normalizeNonNegativeInteger(
+      task.displaySrNo,
+      serialNo
     );
 
   const rawEvidenceSummary =
-    risk.evidenceSummary ??
-    risk.evidence ??
+    task.evidenceSummary ??
+    task.evidence ??
     {
       beforeCount:
-        risk.beforeCount,
+        task.beforeCount,
 
       afterCount:
-        risk.afterCount,
+        task.afterCount,
 
       canMarkComplete:
-        risk.canMarkComplete,
+        task.canMarkComplete,
     };
 
   return {
     _id:
       normalizeTrimmedString(
-        risk._id
+        task._id
       ),
 
     projectId:
       normalizeTrimmedString(
-        risk.projectId
+        task.projectId
       ),
 
     projectCode,
 
     projectReferenceNo,
 
-    serialNo:
-      normalizeNonNegativeInteger(
-        risk.serialNo
-      ),
+    serialNo,
 
-    ...(riskRegisterId
+    displaySrNo,
+
+    ...(taskRegisterId
       ? {
-          riskRegisterId,
+          taskRegisterId,
         }
       : {}),
 
     description:
       normalizeTrimmedString(
-        risk.description
+        task.description
       ),
 
     status:
-      normalizeRiskStatus(
-        risk.status
+      normalizeTaskStatus(
+        task.status
       ),
+
+    completedAt:
+      normalizeTrimmedString(
+        task.completedAt
+      ) || null,
 
     createdAt:
       normalizeTrimmedString(
-        risk.createdAt
+        task.createdAt
       ),
 
     updatedAt:
       normalizeTrimmedString(
-        risk.updatedAt
+        task.updatedAt
       ),
 
     evidenceSummary:
@@ -640,29 +655,16 @@ const normalizeRisk = (
 
 const normalizePagination = (
   rawPagination: unknown,
-  riskCount: number
-): RiskPagination => {
+  taskCount: number
+): TaskPagination => {
   const pagination =
     rawPagination &&
     typeof rawPagination ===
       "object"
-      ? (
-          rawPagination as {
-            page?: unknown;
-
-            limit?: unknown;
-
-            total?: unknown;
-            totalRecords?: unknown;
-            totalRisks?: unknown;
-
-            totalPages?: unknown;
-
-            hasNextPage?: unknown;
-
-            hasPreviousPage?: unknown;
-          }
-        )
+      ? rawPagination as Record<
+          string,
+          unknown
+        >
       : {};
 
   const page =
@@ -678,7 +680,7 @@ const normalizePagination = (
     Math.max(
       normalizeNonNegativeInteger(
         pagination.limit,
-        riskCount || 1
+        taskCount || 1
       ),
       1
     );
@@ -688,8 +690,9 @@ const normalizePagination = (
       normalizeNonNegativeInteger(
         pagination.total ??
           pagination.totalRecords ??
+          pagination.totalTasks ??
           pagination.totalRisks,
-        riskCount
+        taskCount
       ),
       0
     );
@@ -726,33 +729,47 @@ const normalizePagination = (
       typeof pagination
         .hasPreviousPage ===
       "boolean"
-        ? pagination.hasPreviousPage
+        ? pagination
+            .hasPreviousPage
         : page > 1,
   };
 };
 
 /* =========================================================
-   SINGLE RISK EXTRACTOR
+   SINGLE TASK EXTRACTOR
    ========================================================= */
 
-const extractRisk = (
+const extractTask = (
   data: unknown
-): Risk => {
+): Task => {
   if (
     data &&
-    typeof data === "object" &&
-    "risk" in data
+    typeof data === "object"
   ) {
-    return normalizeRisk(
-      (
-        data as {
-          risk?: unknown;
-        }
-      ).risk
-    );
+    const record =
+      data as Record<
+        string,
+        unknown
+      >;
+
+    if (
+      "task" in record
+    ) {
+      return normalizeTask(
+        record.task
+      );
+    }
+
+    if (
+      "risk" in record
+    ) {
+      return normalizeTask(
+        record.risk
+      );
+    }
   }
 
-  return normalizeRisk(
+  return normalizeTask(
     data
   );
 };
@@ -761,24 +778,24 @@ const extractRisk = (
    LIST RESPONSE NORMALIZER
    ========================================================= */
 
-const normalizeRiskListResult = (
+const normalizeTaskListResult = (
   data: unknown
-): RiskListResult => {
+): TaskListResult => {
   if (
     Array.isArray(data)
   ) {
-    const risks =
+    const tasks =
       data.map(
-        normalizeRisk
+        normalizeTask
       );
 
     return {
-      risks,
+      tasks,
 
       pagination:
         normalizePagination(
           undefined,
-          risks.length
+          tasks.length
         ),
     };
   }
@@ -787,27 +804,32 @@ const normalizeRiskListResult = (
     data &&
     typeof data ===
       "object"
-      ? (
-          data as RawRiskListData
-        )
+      ? data as RawTaskListData
       : {};
 
-  const risks =
+  const rawTasks =
     Array.isArray(
-      listData.risks
+      listData.tasks
     )
-      ? listData.risks.map(
-          normalizeRisk
-        )
-      : [];
+      ? listData.tasks
+      : Array.isArray(
+            listData.risks
+          )
+        ? listData.risks
+        : [];
+
+  const tasks =
+    rawTasks.map(
+      normalizeTask
+    );
 
   return {
-    risks,
+    tasks,
 
     pagination:
       normalizePagination(
         listData.pagination,
-        risks.length
+        tasks.length
       ),
   };
 };
@@ -816,50 +838,50 @@ const normalizeRiskListResult = (
    CREATE PAYLOAD PREPARATION
    ========================================================= */
 
-const prepareCreateRiskPayload = (
-  payload: CreateRiskPayload
-) => {
-  const projectId =
-    payload.projectId.trim();
+const prepareCreateTaskPayload = (
+  payload: CreateTaskPayload
+): Record<
+  string,
+  string
+> => {
+  const body: Record<
+    string,
+    string
+  > = {
+    projectId:
+      payload.projectId.trim(),
 
-  const description =
-    payload.description.trim();
-
-  const riskRegisterId =
-    payload.riskRegisterId
-      ?.trim();
-
-  return {
-    projectId,
-
-    description,
-
-    ...(riskRegisterId
-      ? {
-          riskRegisterId:
-            riskRegisterId.toUpperCase(),
-        }
-      : {}),
+    description:
+      payload.description.trim(),
   };
+
+  const taskRegisterId =
+    normalizeTrimmedString(
+      payload.taskRegisterId
+    );
+
+  if (taskRegisterId) {
+    body.taskRegisterId =
+      taskRegisterId.toUpperCase();
+  }
+
+  return body;
 };
 
 /* =========================================================
    UPDATE PAYLOAD PREPARATION
-
-   Only description and riskRegisterId are supported.
    ========================================================= */
 
-const prepareUpdateRiskPayload = (
-  payload: UpdateRiskPayload
+const prepareUpdateTaskPayload = (
+  payload: UpdateTaskPayload
 ): Record<
   string,
   string | null
 > => {
-  const body:
-    Record<
-      string,
-      string | null
-    > = {};
+  const body: Record<
+    string,
+    string | null
+  > = {};
 
   if (
     hasOwnField(
@@ -876,71 +898,61 @@ const prepareUpdateRiskPayload = (
   if (
     hasOwnField(
       payload,
-      "riskRegisterId"
+      "taskRegisterId"
     )
   ) {
-    if (
-      payload.riskRegisterId ===
-      null
-    ) {
-      body.riskRegisterId =
-        null;
-    } else {
-      const riskRegisterId =
-        normalizeTrimmedString(
-          payload.riskRegisterId
-        );
+    const value =
+      payload.taskRegisterId;
 
-      body.riskRegisterId =
-        riskRegisterId
-          ? riskRegisterId
-              .toUpperCase()
-          : null;
-    }
+    body.taskRegisterId =
+      value === null
+        ? null
+        : normalizeTrimmedString(
+            value
+          )
+            .toUpperCase() ||
+          null;
   }
 
   return body;
 };
 
 /* =========================================================
-   CREATE RISK
+   CREATE TASK
 
-   POST /risks
+   POST /tasks
    ========================================================= */
 
-export const createRisk = async (
-  payload: CreateRiskPayload
-): Promise<Risk> => {
+export const createTask = async (
+  payload: CreateTaskPayload
+): Promise<Task> => {
   const response =
     await api.post(
-      "/risks",
-      prepareCreateRiskPayload(
+      "/tasks",
+      prepareCreateTaskPayload(
         payload
       )
     );
 
-  const data =
+  return extractTask(
     extractResponseData<unknown>(
       response
-    );
-
-  return extractRisk(
-    data
+    )
   );
 };
 
 /* =========================================================
-   GET ALL RISKS
+   GET ALL TASKS
 
-   GET /risks
+   GET /tasks
    ========================================================= */
 
-export const getRisks = async (
-  params: RiskListParams = {}
-): Promise<RiskListResult> => {
+export const getTasks = async (
+  params: TaskListParams = {}
+): Promise<TaskListResult> => {
   const response =
     await api.get(
-      "/risks",
+      "/tasks",
       {
         params: {
           ...(params.projectId
@@ -997,33 +1009,30 @@ export const getRisks = async (
       }
     );
 
-  const data =
+  return normalizeTaskListResult(
     extractResponseData<unknown>(
       response
-    );
-
-  return normalizeRiskListResult(
-    data
+    )
   );
 };
 
 /* =========================================================
-   GET RISKS BY PROJECT
+   GET TASKS BY PROJECT
 
-   GET /risks/project/:projectId
+   GET /tasks/project/:projectId
    ========================================================= */
 
-export const getRisksByProject =
+export const getTasksByProject =
   async (
     projectId: string,
     params: Omit<
-      RiskListParams,
+      TaskListParams,
       "projectId"
     > = {}
-  ): Promise<RiskListResult> => {
+  ): Promise<TaskListResult> => {
     const response =
       await api.get(
-        `/risks/project/${encodePathValue(
+        `/tasks/project/${encodePathValue(
           projectId
         )}`,
         {
@@ -1074,29 +1083,26 @@ export const getRisksByProject =
         }
       );
 
-    const data =
+    return normalizeTaskListResult(
       extractResponseData<unknown>(
         response
-      );
-
-    return normalizeRiskListResult(
-      data
+      )
     );
   };
 
 /* =========================================================
-   GET SINGLE RISK
+   GET SINGLE TASK
 
-   GET /risks/:riskId
+   GET /tasks/:taskId
    ========================================================= */
 
-export const getRiskById = async (
-  riskId: string
-): Promise<RiskDetailsResult> => {
+export const getTaskById = async (
+  taskId: string
+): Promise<TaskDetailsResult> => {
   const response =
     await api.get(
-      `/risks/${encodePathValue(
-        riskId
+      `/tasks/${encodePathValue(
+        taskId
       )}`
     );
 
@@ -1107,26 +1113,27 @@ export const getRiskById = async (
 
   if (
     data &&
-    typeof data === "object" &&
-    "risk" in data
+    typeof data === "object"
   ) {
     const details =
-      data as RawRiskDetailsData;
+      data as RawTaskDetailsData;
 
-    const risk =
-      normalizeRisk(
-        details.risk
+    const task =
+      normalizeTask(
+        details.task ??
+          details.risk ??
+          data
       );
 
     const evidence =
       normalizeEvidenceSummary(
         details.evidence ??
-          risk.evidenceSummary
+          task.evidenceSummary
       );
 
     return {
-      risk: {
-        ...risk,
+      task: {
+        ...task,
 
         evidenceSummary:
           evidence,
@@ -1136,19 +1143,19 @@ export const getRiskById = async (
     };
   }
 
-  const risk =
-    normalizeRisk(
+  const task =
+    normalizeTask(
       data
     );
 
   const evidence =
     normalizeEvidenceSummary(
-      risk.evidenceSummary
+      task.evidenceSummary
     );
 
   return {
-    risk: {
-      ...risk,
+    task: {
+      ...task,
 
       evidenceSummary:
         evidence,
@@ -1159,54 +1166,48 @@ export const getRiskById = async (
 };
 
 /* =========================================================
-   UPDATE RISK
+   UPDATE TASK
 
-   PATCH /risks/:riskId
+   PATCH /tasks/:taskId
    ========================================================= */
 
-export const updateRisk = async (
-  riskId: string,
-  payload: UpdateRiskPayload
-): Promise<Risk> => {
-  const body =
-    prepareUpdateRiskPayload(
-      payload
-    );
-
+export const updateTask = async (
+  taskId: string,
+  payload: UpdateTaskPayload
+): Promise<Task> => {
   const response =
     await api.patch(
-      `/risks/${encodePathValue(
-        riskId
+      `/tasks/${encodePathValue(
+        taskId
       )}`,
-      body
+      prepareUpdateTaskPayload(
+        payload
+      )
     );
 
-  const data =
+  return extractTask(
     extractResponseData<unknown>(
       response
-    );
-
-  return extractRisk(
-    data
+    )
   );
 };
 
 /* =========================================================
-   UPDATE STATUS
+   UPDATE TASK STATUS
 
-   PATCH /risks/:riskId/status
+   PATCH /tasks/:taskId/status
    ========================================================= */
 
-export const updateRiskStatus =
+export const updateTaskStatus =
   async (
-    riskId: string,
+    taskId: string,
     payload:
-      UpdateRiskStatusPayload
-  ): Promise<Risk> => {
+      UpdateTaskStatusPayload
+  ): Promise<Task> => {
     const response =
       await api.patch(
-        `/risks/${encodePathValue(
-          riskId
+        `/tasks/${encodePathValue(
+          taskId
         )}/status`,
         {
           status:
@@ -1214,85 +1215,78 @@ export const updateRiskStatus =
         }
       );
 
-    const data =
+    return extractTask(
       extractResponseData<unknown>(
         response
-      );
-
-    return extractRisk(
-      data
+      )
     );
   };
 
 /* =========================================================
    MARK COMPLETE
 
-   At least one Before and one After image required.
+   Requires:
+   >= 1 Before Evidence
+   >= 1 After Evidence
    ========================================================= */
 
-export const markRiskComplete =
+export const markTaskComplete =
   async (
-    riskId: string
-  ): Promise<Risk> => {
+    taskId: string
+  ): Promise<Task> => {
     const response =
       await api.patch(
-        `/risks/${encodePathValue(
-          riskId
+        `/tasks/${encodePathValue(
+          taskId
         )}/complete`
       );
 
-    const data =
+    return extractTask(
       extractResponseData<unknown>(
         response
-      );
-
-    return extractRisk(
-      data
+      )
     );
   };
 
 /* =========================================================
-   MARK IN PROGRESS
+   MOVE / REOPEN TASK TO IN PROGRESS
    ========================================================= */
 
-export const markRiskInProgress =
+export const markTaskInProgress =
   async (
-    riskId: string
-  ): Promise<Risk> => {
+    taskId: string
+  ): Promise<Task> => {
     const response =
       await api.patch(
-        `/risks/${encodePathValue(
-          riskId
+        `/tasks/${encodePathValue(
+          taskId
         )}/in-progress`
       );
 
-    const data =
+    return extractTask(
       extractResponseData<unknown>(
         response
-      );
-
-    return extractRisk(
-      data
+      )
     );
   };
 
 /* =========================================================
-   DELETE RISK
+   DELETE TASK
    ========================================================= */
 
-export const deleteRisk = async (
-  riskId: string
-): Promise<DeleteRiskResult> => {
+export const deleteTask = async (
+  taskId: string
+): Promise<DeleteTaskResult> => {
   const response =
     await api.delete(
-      `/risks/${encodePathValue(
-        riskId
+      `/tasks/${encodePathValue(
+        taskId
       )}`
     );
 
   const data =
     extractResponseData<
-      DeleteRiskResult | undefined
+      DeleteTaskResult | undefined
     >(response);
 
   if (!data) {
@@ -1302,11 +1296,11 @@ export const deleteRisk = async (
   return {
     ...data,
 
-    ...(data.risk
+    ...(data.task
       ? {
-          risk:
-            normalizeRisk(
-              data.risk
+          task:
+            normalizeTask(
+              data.task
             ),
         }
       : {}),
@@ -1317,63 +1311,61 @@ export const deleteRisk = async (
    DISPLAY HELPERS
    ========================================================= */
 
-export const getRiskProjectReference = (
-  risk: Pick<
-    Risk,
+export const getTaskProjectReference = (
+  task: Pick<
+    Task,
     | "projectReferenceNo"
     | "projectCode"
   >
-): string => {
-  return (
-    risk.projectReferenceNo
-      ?.trim() ||
-    risk.projectCode.trim()
-  );
-};
+): string =>
+  task.projectReferenceNo
+    ?.trim() ||
+  task.projectCode.trim();
 
-export const getRiskSerialLabel = (
-  risk: Pick<
-    Risk,
-    "serialNo"
+export const getTaskSerialLabel = (
+  task: Pick<
+    Task,
+    | "serialNo"
+    | "displaySrNo"
   >
-): string => {
-  return String(
-    risk.serialNo
+): string =>
+  String(
+    task.displaySrNo ||
+    task.serialNo
   );
-};
 
 /* =========================================================
-   BUILD DASHBOARD SUMMARY
+   DASHBOARD SUMMARY
    ========================================================= */
 
-export const buildRiskDashboardSummary =
+export const buildTaskDashboardSummary =
   (
-    risks: Risk[]
-  ): RiskDashboardSummary => {
-    const totalRisks =
-      risks.length;
+    tasks: Task[]
+  ): TaskDashboardSummary => {
+    const totalTasks =
+      tasks.length;
 
-    const inProgressRisks =
-      risks.filter(
-        (risk) =>
-          risk.status ===
+    const inProgressTasks =
+      tasks.filter(
+        (task) =>
+          task.status ===
           "in_progress"
       ).length;
 
-    const completeRisks =
-      risks.filter(
-        (risk) =>
-          risk.status ===
+    const completeTasks =
+      tasks.filter(
+        (task) =>
+          task.status ===
           "complete"
       ).length;
 
     const completionPercentage =
-      totalRisks > 0
+      totalTasks > 0
         ? Number(
             (
               (
-                completeRisks /
-                totalRisks
+                completeTasks /
+                totalTasks
               ) *
               100
             ).toFixed(2)
@@ -1381,11 +1373,10 @@ export const buildRiskDashboardSummary =
         : 0;
 
     return {
-      totalRisks,
+      totalTasks,
 
-      inProgressRisks,
-
-      completeRisks,
+      inProgressTasks,
+      completeTasks,
 
       completionPercentage,
     };
@@ -1394,17 +1385,16 @@ export const buildRiskDashboardSummary =
 /* =========================================================
    GET DASHBOARD SUMMARY
 
-   All Risk pages fetch karke frontend par summary
-   calculate hoti hai.
+   Fetch all Task pages and calculate frontend summary.
    ========================================================= */
 
-export const getRiskDashboardSummary =
+export const getTaskDashboardSummary =
   async (
     projectId?: string
-  ): Promise<RiskDashboardSummary> => {
+  ): Promise<TaskDashboardSummary> => {
     const firstPage =
       projectId
-        ? await getRisksByProject(
+        ? await getTasksByProject(
             projectId,
             {
               page: 1,
@@ -1415,7 +1405,7 @@ export const getRiskDashboardSummary =
                 "desc",
             }
           )
-        : await getRisks({
+        : await getTasks({
             page: 1,
             limit: 100,
             sortBy:
@@ -1424,8 +1414,8 @@ export const getRiskDashboardSummary =
               "desc",
           });
 
-    const allRisks = [
-      ...firstPage.risks,
+    const allTasks = [
+      ...firstPage.tasks,
     ];
 
     const totalPages =
@@ -1439,7 +1429,7 @@ export const getRiskDashboardSummary =
     ) {
       const nextPage =
         projectId
-          ? await getRisksByProject(
+          ? await getTasksByProject(
               projectId,
               {
                 page,
@@ -1456,7 +1446,7 @@ export const getRiskDashboardSummary =
                   "desc",
               }
             )
-          : await getRisks({
+          : await getTasks({
               page,
 
               limit:
@@ -1471,12 +1461,275 @@ export const getRiskDashboardSummary =
                 "desc",
             });
 
-      allRisks.push(
-        ...nextPage.risks
+      allTasks.push(
+        ...nextPage.tasks
       );
     }
 
-    return buildRiskDashboardSummary(
-      allRisks
+    return buildTaskDashboardSummary(
+      allTasks
     );
+  };
+
+/* =========================================================
+   TEMPORARY LEGACY RISK COMPATIBILITY EXPORTS
+
+   Purpose:
+   Dashboard ke jo components abhi Risk-era imports use kar
+   rahe hain unko migration ke duran crash hone se bachana.
+
+   New code hamesha Task names use kare:
+   getTasks
+   getTaskById
+   createTask
+   updateTask
+   deleteTask
+   buildTaskDashboardSummary
+
+   Ye aliases final cleanup mein remove kiye ja sakte hain.
+   ========================================================= */
+
+/* ---------- TYPES ---------- */
+
+export type RiskStatus =
+  TaskStatus;
+
+export type RiskEvidenceType =
+  TaskEvidenceType;
+
+export type RiskEvidence =
+  TaskEvidence;
+
+export type RiskEvidenceSummary =
+  TaskEvidenceSummary;
+
+export type Risk =
+  Task;
+
+export type CreateRiskPayload =
+  CreateTaskPayload;
+
+export type UpdateRiskPayload =
+  UpdateTaskPayload;
+
+export type UpdateRiskStatusPayload =
+  UpdateTaskStatusPayload;
+
+export type RiskListParams =
+  TaskListParams;
+
+export type RiskPagination =
+  TaskPagination;
+
+export type RiskListResult = {
+  risks: Risk[];
+  pagination: RiskPagination;
+};
+
+export type RiskDetailsResult = {
+  risk: Risk;
+  evidence: RiskEvidenceSummary;
+};
+
+export type DeleteRiskResult =
+  DeleteTaskResult;
+
+export type RiskDashboardSummary = {
+  totalRisks: number;
+  totalTasks: number;
+
+  pendingRisks: number;
+  inProgressRisks: number;
+  onHoldRisks: number;
+  completeRisks: number;
+  overdueRisks: number;
+
+  completionPercentage: number;
+};
+
+/* ---------- CONSTANTS ---------- */
+
+export const RISK_STATUSES =
+  TASK_STATUSES;
+
+export const RISK_SORT_FIELDS =
+  TASK_SORT_FIELDS;
+
+/* ---------- CRUD ALIASES ---------- */
+
+export const createRisk =
+  createTask;
+
+export const getRisks =
+  async (
+    params: RiskListParams = {}
+  ): Promise<RiskListResult> => {
+    const result =
+      await getTasks(
+        params
+      );
+
+    return {
+      risks:
+        result.tasks,
+
+      pagination:
+        result.pagination,
+    };
+  };
+
+export const getRisksByProject =
+  async (
+    projectId: string,
+    params: Omit<
+      RiskListParams,
+      "projectId"
+    > = {}
+  ): Promise<RiskListResult> => {
+    const result =
+      await getTasksByProject(
+        projectId,
+        params
+      );
+
+    return {
+      risks:
+        result.tasks,
+
+      pagination:
+        result.pagination,
+    };
+  };
+
+export const getRiskById =
+  async (
+    riskId: string
+  ): Promise<RiskDetailsResult> => {
+    const result =
+      await getTaskById(
+        riskId
+      );
+
+    return {
+      risk:
+        result.task,
+
+      evidence:
+        result.evidence,
+    };
+  };
+
+export const updateRisk =
+  updateTask;
+
+export const deleteRisk =
+  deleteTask;
+
+export const markRiskComplete =
+  markTaskComplete;
+
+export const markRiskInProgress =
+  markTaskInProgress;
+
+export const updateRiskStatus =
+  async (
+    riskId: string,
+    status:
+      | RiskStatus
+      | UpdateRiskStatusPayload
+  ): Promise<Risk> => {
+    const normalizedStatus =
+      typeof status ===
+        "string"
+        ? status
+        : status.status;
+
+    return updateTaskStatus(
+      riskId,
+      {
+        status:
+          normalizedStatus,
+      }
+    );
+  };
+
+/* ---------- DISPLAY ALIASES ---------- */
+
+export const getRiskProjectReference =
+  getTaskProjectReference;
+
+export const getRiskSerialLabel =
+  getTaskSerialLabel;
+
+/* ---------- SUMMARY COMPATIBILITY ---------- */
+
+export const buildRiskDashboardSummary =
+  (
+    risks: Risk[]
+  ): RiskDashboardSummary => {
+    const summary =
+      buildTaskDashboardSummary(
+        risks
+      );
+
+    return {
+      totalRisks:
+        summary.totalTasks,
+
+      totalTasks:
+        summary.totalTasks,
+
+      /*
+        Current Task lifecycle has no Pending / On Hold /
+        Overdue state. Legacy UI receives zero until those
+        components are migrated.
+      */
+      pendingRisks: 0,
+
+      inProgressRisks:
+        summary.inProgressTasks,
+
+      onHoldRisks: 0,
+
+      completeRisks:
+        summary.completeTasks,
+
+      overdueRisks: 0,
+
+      completionPercentage:
+        summary.completionPercentage,
+    };
+  };
+
+export const getRiskDashboardSummary =
+  async (
+    projectId?: string
+  ): Promise<RiskDashboardSummary> => {
+    const summary =
+      await getTaskDashboardSummary(
+        projectId
+      );
+
+    return {
+      totalRisks:
+        summary.totalTasks,
+
+      totalTasks:
+        summary.totalTasks,
+
+      pendingRisks: 0,
+
+      inProgressRisks:
+        summary.inProgressTasks,
+
+      onHoldRisks: 0,
+
+      completeRisks:
+        summary.completeTasks,
+
+      overdueRisks: 0,
+
+      completionPercentage:
+        summary.completionPercentage,
+    };
   };

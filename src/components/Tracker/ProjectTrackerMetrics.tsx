@@ -7,16 +7,21 @@ import {
 } from "react";
 
 import {
-  buildRiskDashboardSummary,
-  getRisks,
-  type Risk,
-} from "../../services/risk/risk.service";
+  buildTaskDashboardSummary,
+  getTasks,
+  type Task,
+} from "../../services/task_register/task.service";
+
+import {
+  getProjectDashboardStats,
+  type ProjectDashboardStats,
+} from "../../services/project/project.service";
 
 /* =========================================================
    ICONS
    ========================================================= */
 
-const RiskRegisterIcon = () => (
+const TaskRegisterIcon = () => (
   <svg
     viewBox="0 0 24 24"
     fill="none"
@@ -33,7 +38,7 @@ const RiskRegisterIcon = () => (
   </svg>
 );
 
-const InProgressIcon = () => (
+const ProjectsIcon = () => (
   <svg
     viewBox="0 0 24 24"
     fill="none"
@@ -44,17 +49,29 @@ const InProgressIcon = () => (
     className="size-6"
     aria-hidden="true"
   >
-    <circle
-      cx="12"
-      cy="12"
-      r="9"
-    />
+    <path d="M3 7.5L12 3L21 7.5L12 12L3 7.5Z" />
+    <path d="M3 12L12 16.5L21 12" />
+    <path d="M3 16.5L12 21L21 16.5" />
+  </svg>
+);
 
+const ActiveProjectIcon = () => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="size-6"
+    aria-hidden="true"
+  >
+    <circle cx="12" cy="12" r="9" />
     <path d="M12 7V12L15.5 14" />
   </svg>
 );
 
-const CompleteIcon = () => (
+const CompletedProjectIcon = () => (
   <svg
     viewBox="0 0 24 24"
     fill="none"
@@ -65,42 +82,8 @@ const CompleteIcon = () => (
     className="size-6"
     aria-hidden="true"
   >
-    <circle
-      cx="12"
-      cy="12"
-      r="9"
-    />
-
+    <circle cx="12" cy="12" r="9" />
     <path d="M8 12L11 15L16.5 9.5" />
-  </svg>
-);
-
-const EvidenceIcon = () => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.8"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className="size-6"
-    aria-hidden="true"
-  >
-    <rect
-      x="3"
-      y="4"
-      width="18"
-      height="16"
-      rx="2"
-    />
-
-    <circle
-      cx="8.5"
-      cy="9"
-      r="1.5"
-    />
-
-    <path d="M4 17L9 12L13 16L16 13L21 18" />
   </svg>
 );
 
@@ -123,11 +106,11 @@ type MetricCardProps = {
 };
 
 type DashboardMetricsData = {
-  totalRisks: number;
+  totalTasks: number;
 
-  inProgressRisks: number;
+  inProgressTasks: number;
 
-  completeRisks: number;
+  completeTasks: number;
 
   completionPercentage: number;
 
@@ -142,12 +125,21 @@ type DashboardMetricsData = {
    CONSTANTS
    ========================================================= */
 
+const EMPTY_PROJECT_STATS: ProjectDashboardStats = {
+  totalProjects: 0,
+  activeProjects: 0,
+  completedProjects: 0,
+  draftProjects: 0,
+  onHoldProjects: 0,
+  archivedProjects: 0,
+};
+
 const EMPTY_METRICS: DashboardMetricsData = {
-  totalRisks: 0,
+  totalTasks: 0,
 
-  inProgressRisks: 0,
+  inProgressTasks: 0,
 
-  completeRisks: 0,
+  completeTasks: 0,
 
   completionPercentage: 0,
 
@@ -207,13 +199,13 @@ const getErrorMessage = (
 };
 
 /* =========================================================
-   FETCH ALL RISKS
+   FETCH ALL TASKS
    ========================================================= */
 
-const fetchAllRisks =
-  async (): Promise<Risk[]> => {
+const fetchAllTasks =
+  async (): Promise<Task[]> => {
     const firstPage =
-      await getRisks({
+      await getTasks({
         page: 1,
 
         limit: 100,
@@ -225,8 +217,8 @@ const fetchAllRisks =
           "desc",
       });
 
-    const allRisks = [
-      ...firstPage.risks,
+    const allTasks = [
+      ...firstPage.tasks,
     ];
 
     const totalPages =
@@ -236,7 +228,7 @@ const fetchAllRisks =
     if (
       totalPages <= 1
     ) {
-      return allRisks;
+      return allTasks;
     }
 
     const remainingRequests =
@@ -250,7 +242,7 @@ const fetchAllRisks =
           _,
           index
         ) =>
-          getRisks({
+          getTasks({
             page:
               index + 2,
 
@@ -273,40 +265,40 @@ const fetchAllRisks =
 
     remainingPages.forEach(
       (result) => {
-        allRisks.push(
-          ...result.risks
+        allTasks.push(
+          ...result.tasks
         );
       }
     );
 
-    return allRisks;
+    return allTasks;
   };
 
 /* =========================================================
-   BUILD METRICS
+   BUILD TASK METRICS
    ========================================================= */
 
 const buildDashboardMetrics = (
-  risks: Risk[]
+  tasks: Task[]
 ): DashboardMetricsData => {
-  const riskSummary =
-    buildRiskDashboardSummary(
-      risks
+  const taskSummary =
+    buildTaskDashboardSummary(
+      tasks
     );
 
   const evidenceCounts =
-    risks.reduce(
+    tasks.reduce(
       (
         current,
-        risk
+        task
       ) => {
         current.beforeEvidenceCount +=
-          risk.evidenceSummary
+          task.evidenceSummary
             ?.beforeCount ??
           0;
 
         current.afterEvidenceCount +=
-          risk.evidenceSummary
+          task.evidenceSummary
             ?.afterCount ??
           0;
 
@@ -323,19 +315,19 @@ const buildDashboardMetrics = (
     );
 
   return {
-    totalRisks:
-      riskSummary.totalRisks,
+    totalTasks:
+      taskSummary.totalTasks,
 
-    inProgressRisks:
-      riskSummary
-        .inProgressRisks,
+    inProgressTasks:
+      taskSummary
+        .inProgressTasks,
 
-    completeRisks:
-      riskSummary
-        .completeRisks,
+    completeTasks:
+      taskSummary
+        .completeTasks,
 
     completionPercentage:
-      riskSummary
+      taskSummary
         .completionPercentage,
 
     beforeEvidenceCount:
@@ -459,10 +451,18 @@ function LoadingMetricCard() {
 
 export default function ProjectTrackerMetrics() {
   const [
-    risks,
-    setRisks,
+    projectStats,
+    setProjectStats,
   ] =
-    useState<Risk[]>([]);
+    useState<ProjectDashboardStats>(
+      EMPTY_PROJECT_STATS
+    );
+
+  const [
+    tasks,
+    setTasks,
+  ] =
+    useState<Task[]>([]);
 
   const [
     loading,
@@ -490,16 +490,30 @@ export default function ProjectTrackerMetrics() {
 
           setError("");
 
-          const result =
-            await fetchAllRisks();
+          const [
+            projectResult,
+            taskResult,
+          ] =
+            await Promise.all([
+              getProjectDashboardStats(),
+              fetchAllTasks(),
+            ]);
 
-          setRisks(
-            result
+          setProjectStats(
+            projectResult
+          );
+
+          setTasks(
+            taskResult
           );
         } catch (
           requestError
         ) {
-          setRisks([]);
+          setProjectStats(
+            EMPTY_PROJECT_STATS
+          );
+
+          setTasks([]);
 
           setError(
             getErrorMessage(
@@ -528,13 +542,13 @@ export default function ProjectTrackerMetrics() {
   const metrics =
     useMemo(
       () =>
-        risks.length > 0
+        tasks.length > 0
           ? buildDashboardMetrics(
-              risks
+              tasks
             )
           : EMPTY_METRICS,
       [
-        risks,
+        tasks,
       ]
     );
 
@@ -593,13 +607,13 @@ export default function ProjectTrackerMetrics() {
 
       <div className="grid w-full min-w-0 max-w-full grid-cols-1 auto-rows-fr gap-4 sm:grid-cols-2 sm:gap-5">
         <MetricCard
-          title="Total Risks"
+          title="Total Projects"
           value={String(
-            metrics.totalRisks
+            projectStats.totalProjects
           )}
-          detail="All Records"
+          detail={`${projectStats.activeProjects} Active`}
           icon={
-            <RiskRegisterIcon />
+            <ProjectsIcon />
           }
           iconWrapperClassName="bg-slate-100 text-slate-700 dark:bg-slate-500/15 dark:text-slate-300"
           detailClassName="bg-slate-100 text-slate-700 dark:bg-slate-500/15 dark:text-slate-300"
@@ -607,31 +621,31 @@ export default function ProjectTrackerMetrics() {
         />
 
         <MetricCard
-          title="In Progress"
+          title="Active Projects"
           value={String(
-            metrics.inProgressRisks
+            projectStats.activeProjects
           )}
-          detail="Active Work"
+          detail="Current Work"
           icon={
-            <InProgressIcon />
+            <ActiveProjectIcon />
           }
           iconWrapperClassName="bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
           detailClassName="bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
           accentClassName="bg-amber-500"
           pulse={
-            metrics.inProgressRisks >
+            projectStats.activeProjects >
             0
           }
         />
 
         <MetricCard
-          title="Complete"
+          title="Completed Projects"
           value={String(
-            metrics.completeRisks
+            projectStats.completedProjects
           )}
-          detail={`${metrics.completionPercentage}% Complete`}
+          detail={`${projectStats.completedProjects} Completed`}
           icon={
-            <CompleteIcon />
+            <CompletedProjectIcon />
           }
           iconWrapperClassName="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
           detailClassName="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
@@ -639,13 +653,13 @@ export default function ProjectTrackerMetrics() {
         />
 
         <MetricCard
-          title="Evidence Images"
+          title="Total Tasks"
           value={String(
-            metrics.totalEvidenceCount
+            metrics.totalTasks
           )}
-          detail={`${metrics.beforeEvidenceCount} Before · ${metrics.afterEvidenceCount} After`}
+          detail={`${metrics.inProgressTasks} In Progress · ${metrics.completeTasks} Complete`}
           icon={
-            <EvidenceIcon />
+            <TaskRegisterIcon />
           }
           iconWrapperClassName="bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300"
           detailClassName="bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300"

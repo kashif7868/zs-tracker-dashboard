@@ -25,26 +25,28 @@ import {
 } from "../ui/dropdown/DropdownItem";
 
 import {
-  getRiskDashboardSummary,
-  type RiskDashboardSummary,
-} from "../../services/risk/risk.service";
+  getProjectDashboardStats,
+  type ProjectDashboardStats,
+} from "../../services/project/project.service";
 
 /* =========================================================
    CONSTANTS
    ========================================================= */
 
-const EMPTY_SUMMARY: RiskDashboardSummary = {
-  totalRisks: 0,
-  inProgressRisks: 0,
-  completeRisks: 0,
-  completionPercentage: 0,
+const EMPTY_SUMMARY: ProjectDashboardStats = {
+  totalProjects: 0,
+  activeProjects: 0,
+  completedProjects: 0,
+  draftProjects: 0,
+  onHoldProjects: 0,
+  archivedProjects: 0,
 };
 
 /* =========================================================
    ICONS
    ========================================================= */
 
-const TotalRiskIcon = () => (
+const TotalProjectIcon = () => (
   <svg
     viewBox="0 0 24 24"
     fill="none"
@@ -55,13 +57,13 @@ const TotalRiskIcon = () => (
     className="size-4"
     aria-hidden="true"
   >
-    <path d="M12 3L20 6V11C20 16 16.6 19.7 12 21C7.4 19.7 4 16 4 11V6L12 3Z" />
-    <path d="M12 8V13" />
-    <path d="M12 16H12.01" />
+    <path d="M3 7.5L12 3L21 7.5L12 12L3 7.5Z" />
+    <path d="M3 12L12 16.5L21 12" />
+    <path d="M3 16.5L12 21L21 16.5" />
   </svg>
 );
 
-const InProgressIcon = () => (
+const ActiveProjectIcon = () => (
   <svg
     viewBox="0 0 24 24"
     fill="none"
@@ -72,17 +74,12 @@ const InProgressIcon = () => (
     className="size-4"
     aria-hidden="true"
   >
-    <circle
-      cx="12"
-      cy="12"
-      r="9"
-    />
-
+    <circle cx="12" cy="12" r="9" />
     <path d="M12 7V12L15.5 14" />
   </svg>
 );
 
-const CompleteIcon = () => (
+const CompletedIcon = () => (
   <svg
     viewBox="0 0 24 24"
     fill="none"
@@ -93,12 +90,7 @@ const CompleteIcon = () => (
     className="size-4"
     aria-hidden="true"
   >
-    <circle
-      cx="12"
-      cy="12"
-      r="9"
-    />
-
+    <circle cx="12" cy="12" r="9" />
     <path d="M8 12L11 15L16.5 9.5" />
   </svg>
 );
@@ -138,7 +130,6 @@ const getErrorMessage = (
         response?: {
           data?: {
             message?: string;
-
             errors?: Array<{
               message?: string;
               msg?: string;
@@ -156,17 +147,15 @@ const getErrorMessage = (
         ?.msg ||
       requestError.response
         ?.data?.message ||
-      "Project completion data could not be loaded."
+      "Project summary could not be loaded."
     );
   }
 
-  if (
-    error instanceof Error
-  ) {
+  if (error instanceof Error) {
     return error.message;
   }
 
-  return "Project completion data could not be loaded.";
+  return "Project summary could not be loaded.";
 };
 
 /* =========================================================
@@ -180,7 +169,6 @@ function LoadingCard() {
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <div className="h-6 w-40 max-w-full rounded bg-gray-200 dark:bg-gray-800" />
-
             <div className="mt-3 h-4 w-56 max-w-full rounded bg-gray-200 dark:bg-gray-800" />
           </div>
 
@@ -188,9 +176,7 @@ function LoadingCard() {
         </div>
 
         <div className="mx-auto mt-6 h-[190px] w-full max-w-[310px] rounded-[50%] bg-gray-100 dark:bg-gray-800" />
-
         <div className="mx-auto mt-4 h-4 w-48 max-w-full rounded bg-gray-200 dark:bg-gray-800" />
-
         <div className="mt-5 h-2.5 w-full rounded-full bg-gray-200 dark:bg-gray-800" />
       </div>
 
@@ -203,15 +189,11 @@ function LoadingCard() {
             index
           ) => (
             <div
-              key={
-                index
-              }
+              key={index}
               className="min-w-0 px-2 py-4 text-center"
             >
               <div className="mx-auto size-7 rounded-lg bg-gray-200 dark:bg-gray-800" />
-
               <div className="mx-auto mt-2 h-3 w-16 max-w-full rounded bg-gray-200 dark:bg-gray-800" />
-
               <div className="mx-auto mt-2 h-5 w-8 rounded bg-gray-200 dark:bg-gray-800" />
             </div>
           )
@@ -239,7 +221,7 @@ export default function ProjectCompletionCard() {
     summary,
     setSummary,
   ] =
-    useState<RiskDashboardSummary>(
+    useState<ProjectDashboardStats>(
       EMPTY_SUMMARY
     );
 
@@ -274,23 +256,17 @@ export default function ProjectCompletionCard() {
           if (
             showRefreshLoader
           ) {
-            setRefreshing(
-              true
-            );
+            setRefreshing(true);
           } else {
-            setLoading(
-              true
-            );
+            setLoading(true);
           }
 
           setError("");
 
           const result =
-            await getRiskDashboardSummary();
+            await getProjectDashboardStats();
 
-          setSummary(
-            result
-          );
+          setSummary(result);
         } catch (
           requestError
         ) {
@@ -304,13 +280,8 @@ export default function ProjectCompletionCard() {
             )
           );
         } finally {
-          setLoading(
-            false
-          );
-
-          setRefreshing(
-            false
-          );
+          setLoading(false);
+          setRefreshing(false);
         }
       },
       []
@@ -318,33 +289,37 @@ export default function ProjectCompletionCard() {
 
   useEffect(() => {
     void loadSummary();
-  }, [
-    loadSummary,
-  ]);
+  }, [loadSummary]);
 
   /* =======================================================
      VALUES
      ======================================================= */
 
-  const totalRisks =
-    summary.totalRisks;
+  const totalProjects =
+    summary.totalProjects;
 
-  const inProgressRisks =
-    summary.inProgressRisks;
+  const activeProjects =
+    summary.activeProjects;
 
-  const completedRisks =
-    summary.completeRisks;
+  const completedProjects =
+    summary.completedProjects;
 
   const completionPercentage =
-    Math.min(
-      Math.max(
-        Number(
-          summary.completionPercentage
-        ) || 0,
-        0
-      ),
-      100
-    );
+    totalProjects > 0
+      ? Math.min(
+          Math.max(
+            Math.round(
+              (
+                completedProjects /
+                totalProjects
+              ) *
+                100
+            ),
+            0
+          ),
+          100
+        )
+      : 0;
 
   const remainingPercentage =
     Math.max(
@@ -387,7 +362,6 @@ export default function ProjectCompletionCard() {
 
           animations: {
             enabled: true,
-
             speed: 500,
           },
 
@@ -473,22 +447,13 @@ export default function ProjectCompletionCard() {
 
         tooltip: {
           enabled: true,
-
-          y: {
-            formatter: (
-              value: number
-            ) =>
-              `${value.toFixed(
-                1
-              )}% completed`,
-          },
         },
       }),
       []
     );
 
   /* =======================================================
-     DROPDOWN
+     DROPDOWN ACTIONS
      ======================================================= */
 
   const toggleDropdown =
@@ -503,26 +468,24 @@ export default function ProjectCompletionCard() {
 
   const closeDropdown =
     () => {
-      setIsOpen(
-        false
-      );
+      setIsOpen(false);
     };
 
-  const openRiskRegister =
+  const openProjects =
     () => {
       closeDropdown();
 
       navigate(
-        "/risks"
+        "/projects"
       );
     };
 
-  const createRisk =
+  const createProject =
     () => {
       closeDropdown();
 
       navigate(
-        "/risks/create"
+        "/projects/create"
       );
     };
 
@@ -551,10 +514,6 @@ export default function ProjectCompletionCard() {
 
   return (
     <section className="flex min-h-[440px] w-full min-w-0 max-w-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
-      {/* ===================================================
-          MAIN CONTENT
-          =================================================== */}
-
       <div className="flex min-w-0 flex-1 flex-col p-5 sm:p-6">
         {/* HEADER */}
 
@@ -571,11 +530,9 @@ export default function ProjectCompletionCard() {
             </div>
 
             <p className="mt-1.5 max-w-md text-sm leading-5 text-gray-500 dark:text-gray-400">
-              Overall Risk rectification progress.
+              Overall project lifecycle completion across the tracker.
             </p>
           </div>
-
-          {/* OPTIONS */}
 
           <div className="relative shrink-0">
             <button
@@ -606,20 +563,20 @@ export default function ProjectCompletionCard() {
             >
               <DropdownItem
                 onItemClick={
-                  openRiskRegister
+                  openProjects
                 }
                 className="flex w-full rounded-lg text-left font-normal text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
               >
-                View Risk Register
+                View Projects
               </DropdownItem>
 
               <DropdownItem
                 onItemClick={
-                  createRisk
+                  createProject
                 }
                 className="flex w-full rounded-lg text-left font-normal text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
               >
-                Create Risk
+                Create Project
               </DropdownItem>
 
               <DropdownItem
@@ -669,12 +626,7 @@ export default function ProjectCompletionCard() {
           </div>
         ) : null}
 
-        {/* =================================================
-            RADIAL CHART
-
-            Width is explicitly constrained to available card
-            width to prevent ApexCharts horizontal overflow.
-            ================================================= */}
+        {/* RADIAL CHART */}
 
         <div className="mt-3 w-full min-w-0 max-w-full overflow-hidden">
           <div className="mx-auto w-full min-w-0 max-w-[390px] overflow-hidden">
@@ -696,22 +648,21 @@ export default function ProjectCompletionCard() {
 
         <div className="-mt-8 flex w-full min-w-0 justify-center px-3">
           <span className="inline-flex max-w-full items-center justify-center rounded-full bg-emerald-50 px-3 py-1.5 text-center text-[11px] font-bold leading-4 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
-            {completedRisks} of{" "}
-            {totalRisks} completed
+            {completedProjects} of{" "}
+            {totalProjects} projects completed
           </span>
         </div>
 
         {/* DESCRIPTION */}
 
         <p className="mx-auto mt-4 max-w-[420px] text-center text-xs leading-5 text-gray-500 dark:text-gray-400 sm:text-sm">
-          {completedRisks} completed
-          {" · "}
-          {inProgressRisks} in progress
+          {activeProjects} active project
+          {activeProjects === 1
+            ? ""
+            : "s"}
         </p>
 
-        {/* =================================================
-            PROGRESS BAR
-            ================================================= */}
+        {/* PROGRESS BAR */}
 
         <div className="mt-auto pt-5">
           <div className="mb-2 flex min-w-0 items-center justify-between gap-3 text-xs font-semibold">
@@ -742,65 +693,54 @@ export default function ProjectCompletionCard() {
 
             <span className="shrink-0">
               Remaining{" "}
-              {remainingPercentage.toFixed(
-                0
-              )}
-              %
+              {remainingPercentage}%
             </span>
           </div>
         </div>
       </div>
 
-      {/* ===================================================
-          BOTTOM SUMMARY
-          =================================================== */}
+      {/* BOTTOM SUMMARY */}
 
       <div className="grid w-full min-w-0 grid-cols-3 border-t border-gray-200 bg-gray-50/60 dark:border-gray-800 dark:bg-gray-950/30">
-        {/* TOTAL */}
-
         <div className="min-w-0 px-2 py-3.5 text-center sm:px-3">
           <div className="mx-auto flex size-7 items-center justify-center rounded-lg bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-300">
-            <TotalRiskIcon />
+            <TotalProjectIcon />
           </div>
 
           <p className="mt-2 truncate text-[10px] font-medium text-gray-500 dark:text-gray-400 sm:text-xs">
-            Total Risks
+            Total Projects
           </p>
 
           <p className="mt-0.5 text-base font-bold text-gray-800 dark:text-white/90">
-            {totalRisks}
+            {totalProjects}
           </p>
         </div>
-
-        {/* IN PROGRESS */}
 
         <div className="min-w-0 border-x border-gray-200 px-2 py-3.5 text-center dark:border-gray-800 sm:px-3">
           <div className="mx-auto flex size-7 items-center justify-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
-            <InProgressIcon />
+            <ActiveProjectIcon />
           </div>
 
           <p className="mt-2 truncate text-[10px] font-medium text-gray-500 dark:text-gray-400 sm:text-xs">
-            In Progress
+            Active
           </p>
 
           <p className="mt-0.5 text-base font-bold text-amber-700 dark:text-amber-400">
-            {inProgressRisks}
+            {activeProjects}
           </p>
         </div>
 
-        {/* COMPLETE */}
-
         <div className="min-w-0 px-2 py-3.5 text-center sm:px-3">
           <div className="mx-auto flex size-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
-            <CompleteIcon />
+            <CompletedIcon />
           </div>
 
           <p className="mt-2 truncate text-[10px] font-medium text-gray-500 dark:text-gray-400 sm:text-xs">
-            Complete
+            Completed
           </p>
 
           <p className="mt-0.5 text-base font-bold text-emerald-700 dark:text-emerald-400">
-            {completedRisks}
+            {completedProjects}
           </p>
         </div>
       </div>

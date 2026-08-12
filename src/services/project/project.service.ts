@@ -10,8 +10,16 @@ export type ProjectStatus =
   | "draft"
   | "active"
   | "on_hold"
-  | "awaiting_verification"
   | "completed"
+  | "archived";
+
+export type ProjectScheduleStatus =
+  | "not_started"
+  | "on_track"
+  | "overdue"
+  | "completed_early"
+  | "completed_on_time"
+  | "completed_late"
   | "archived";
 
 export type ProjectPriority =
@@ -351,7 +359,14 @@ export type Project = {
   createdAt?: string;
   updatedAt?: string;
 
+  startedAt?: string | null;
+  putOnHoldAt?: string | null;
+  resumedAt?: string | null;
   archivedAt?: string | null;
+
+  scheduleStatus: ProjectScheduleStatus;
+  isOverdue: boolean;
+  daysOverdue: number;
 
   /* =======================================================
      TEMPORARY FRONTEND COMPATIBILITY PROPERTIES
@@ -446,15 +461,10 @@ export type CreateProjectPayload = {
 };
 
 export type UpdateProjectPayload =
-  Partial<CreateProjectPayload> & {
-    actualCompletionDate?:
-      | string
-      | null;
-
-    completedAt?:
-      | string
-      | null;
-  };
+  Omit<
+    Partial<CreateProjectPayload>,
+    "status"
+  >;
 
 export type ProjectQueryParams = {
   page?: number;
@@ -509,6 +519,24 @@ export type ProjectListResponse = {
   hasNextPage: boolean;
 
   hasPreviousPage: boolean;
+};
+
+
+/* =========================================================
+   PROJECT DASHBOARD STATS
+
+   Dashboard top cards ke liye project-level live counts.
+   Backend list endpoint ki pagination totals use hongi.
+   ========================================================= */
+
+export type ProjectDashboardStats = {
+  totalProjects: number;
+  activeProjects: number;
+  completedProjects: number;
+
+  draftProjects: number;
+  onHoldProjects: number;
+  archivedProjects: number;
 };
 
 /* =========================================================
@@ -1374,15 +1402,52 @@ const buildTrackerSummaryFromRisks = (
 
 const normalizeTrackerSummary = (
   value: unknown,
-  risks: ProjectRisk[]
+  risks: ProjectRisk[],
+  storedRiskSummary: ProjectRiskSummary,
+  storedProgress: ProjectProgress
 ): ProjectTrackerSummary => {
   const derived =
     buildTrackerSummaryFromRisks(
       risks
     );
 
+  /*
+    Public client endpoint risks array return na kare to
+    backend ke synchronized riskSummary/progress ko fallback
+    source of truth use karein.
+
+    Is se public tracker par Risk Groups / Evidence / Progress
+    zero nahi dikhenge jab project summary backend mein
+    correctly synchronized ho.
+  */
+
+  const fallback: ProjectTrackerSummary = {
+    totalRisks:
+      storedRiskSummary
+        .totalRiskGroups,
+
+    complete:
+      storedRiskSummary.closed,
+
+    inProgress:
+      storedRiskSummary
+        .inProgress,
+
+    totalEvidence:
+      storedRiskSummary
+        .totalEvidence,
+
+    overallProgress:
+      storedProgress.overall,
+
+    evidenceProgress:
+      storedProgress.evidence,
+  };
+
   if (!isObject(value)) {
-    return derived;
+    return risks.length > 0
+      ? derived
+      : fallback;
   }
 
   return {
@@ -1391,7 +1456,7 @@ const normalizeTrackerSummary = (
         ? derived.totalRisks
         : getNumber(
             value.totalRisks,
-            derived.totalRisks
+            fallback.totalRisks
           ),
 
     complete:
@@ -1399,7 +1464,7 @@ const normalizeTrackerSummary = (
         ? derived.complete
         : getNumber(
             value.complete,
-            derived.complete
+            fallback.complete
           ),
 
     inProgress:
@@ -1407,7 +1472,7 @@ const normalizeTrackerSummary = (
         ? derived.inProgress
         : getNumber(
             value.inProgress,
-            derived.inProgress
+            fallback.inProgress
           ),
 
     totalEvidence:
@@ -1415,21 +1480,23 @@ const normalizeTrackerSummary = (
         ? derived.totalEvidence
         : getNumber(
             value.totalEvidence,
-            derived.totalEvidence
+            fallback.totalEvidence
           ),
 
     overallProgress:
       risks.length > 0
         ? derived.overallProgress
         : clampPercentage(
-            value.overallProgress
+            value.overallProgress ??
+            fallback.overallProgress
           ),
 
     evidenceProgress:
       risks.length > 0
         ? derived.evidenceProgress
         : clampPercentage(
-            value.evidenceProgress
+            value.evidenceProgress ??
+            fallback.evidenceProgress
           ),
   };
 };
@@ -1570,7 +1637,6 @@ const normalizeStatus = (
     case "draft":
     case "active":
     case "on_hold":
-    case "awaiting_verification":
     case "completed":
     case "archived":
       return value;
@@ -1584,6 +1650,36 @@ const normalizeStatus = (
 
     default:
       return "draft";
+  }
+};
+
+const normalizeScheduleStatus = (
+  value: unknown,
+  status: ProjectStatus,
+  isOverdue: boolean
+): ProjectScheduleStatus => {
+  switch (value) {
+    case "not_started":
+    case "on_track":
+    case "overdue":
+    case "completed_early":
+    case "completed_on_time":
+    case "completed_late":
+    case "archived":
+      return value;
+
+    default:
+      if (status === "archived") {
+        return "archived";
+      }
+
+      if (status === "completed") {
+        return "completed_on_time";
+      }
+
+      return isOverdue
+        ? "overdue"
+        : "on_track";
   }
 };
 
@@ -1693,16 +1789,23 @@ const normalizeProject = (
       value.risks
     );
 
-  const trackerSummary =
-    normalizeTrackerSummary(
-      value.trackerSummary,
-      risks
-    );
-
   const storedProgress =
     normalizeProgress(
       value.progressBreakdown ??
       value.progress
+    );
+
+  const storedRiskSummary =
+    normalizeRiskSummary(
+      value.riskSummary
+    );
+
+  const trackerSummary =
+    normalizeTrackerSummary(
+      value.trackerSummary,
+      risks,
+      storedRiskSummary,
+      storedProgress
     );
 
   const progressBreakdown =
@@ -1710,11 +1813,6 @@ const normalizeProject = (
       storedProgress,
       trackerSummary,
       risks
-    );
-
-  const storedRiskSummary =
-    normalizeRiskSummary(
-      value.riskSummary
     );
 
   const riskSummary =
@@ -1796,6 +1894,24 @@ const normalizeProject = (
   const updatedBy =
     normalizeUserOrId(
       value.updatedBy
+    );
+
+  const isOverdue =
+    value.isOverdue === true;
+
+  const scheduleStatus =
+    normalizeScheduleStatus(
+      value.scheduleStatus,
+      status,
+      isOverdue
+    );
+
+  const daysOverdue =
+    Math.max(
+      0,
+      getNumber(
+        value.daysOverdue
+      )
     );
 
   return {
@@ -1974,14 +2090,29 @@ const normalizeProject = (
         }
       : {}),
 
-    ...(isString(
-      value.archivedAt
-    )
-      ? {
-          archivedAt:
-            value.archivedAt,
-        }
-      : {}),
+    startedAt:
+      isString(value.startedAt)
+        ? value.startedAt
+        : null,
+
+    putOnHoldAt:
+      isString(value.putOnHoldAt)
+        ? value.putOnHoldAt
+        : null,
+
+    resumedAt:
+      isString(value.resumedAt)
+        ? value.resumedAt
+        : null,
+
+    archivedAt:
+      isString(value.archivedAt)
+        ? value.archivedAt
+        : null,
+
+    scheduleStatus,
+    isOverdue,
+    daysOverdue,
 
     /* =====================================================
        COMPATIBILITY ALIASES
@@ -2019,7 +2150,8 @@ const normalizeProject = (
         .totalRiskGroups,
 
     openRisksCount:
-      riskSummary.open,
+      riskSummary.open +
+      riskSummary.inProgress,
 
     criticalRisksCount:
       riskSummary.extreme,
@@ -2659,14 +2791,6 @@ const prepareUpdatePayload = (
   }
 
   if (
-    payload.status !==
-    undefined
-  ) {
-    updatePayload.status =
-      payload.status;
-  }
-
-  if (
     payload.overallRiskLevel !==
     undefined
   ) {
@@ -2758,20 +2882,6 @@ const prepareUpdatePayload = (
       payload.notes.trim();
   }
 
-  if (
-    payload
-      .actualCompletionDate !==
-      undefined ||
-    payload.completedAt !==
-      undefined
-  ) {
-    updatePayload
-      .actualCompletionDate =
-      payload
-        .actualCompletionDate ??
-      payload.completedAt;
-  }
-
   return removeUndefinedValues(
     updatePayload
   );
@@ -2848,6 +2958,93 @@ export const getActiveProjects =
     return result.projects;
   };
 
+
+/* =========================================================
+   GET PROJECT DASHBOARD STATS
+
+   Existing GET /projects endpoint use karta hai.
+   Har request sirf 1 record mangti hai; actual count
+   pagination.totalProjects se milta hai.
+
+   Isliye dashboard ko tamam projects download karne ki
+   zarurat nahi.
+   ========================================================= */
+
+export const getProjectDashboardStats =
+  async (): Promise<
+    ProjectDashboardStats
+  > => {
+    const [
+      all,
+      active,
+      completed,
+      draft,
+      onHold,
+      archived,
+    ] =
+      await Promise.all([
+        getProjects({
+          page: 1,
+          limit: 1,
+        }),
+
+        getProjects({
+          page: 1,
+          limit: 1,
+          status:
+            "active",
+        }),
+
+        getProjects({
+          page: 1,
+          limit: 1,
+          status:
+            "completed",
+        }),
+
+        getProjects({
+          page: 1,
+          limit: 1,
+          status:
+            "draft",
+        }),
+
+        getProjects({
+          page: 1,
+          limit: 1,
+          status:
+            "on_hold",
+        }),
+
+        getProjects({
+          page: 1,
+          limit: 1,
+          status:
+            "archived",
+        }),
+      ]);
+
+    return {
+      totalProjects:
+        all.total,
+
+      activeProjects:
+        active.total,
+
+      completedProjects:
+        completed.total,
+
+      draftProjects:
+        draft.total,
+
+      onHoldProjects:
+        onHold.total,
+
+      archivedProjects:
+        archived.total,
+    };
+  };
+
 export const getProjectById =
   async (
     projectId: string
@@ -2895,6 +3092,83 @@ export const updateProject =
         prepareUpdatePayload(
           payload
         )
+      );
+
+    return extractProjectResponse(
+      response.data
+    );
+  };
+
+/* =========================================================
+   PROJECT LIFECYCLE API METHODS
+
+   Status changes are intentionally separate from Edit
+   Project. Backend validates every transition.
+   ========================================================= */
+
+export const startProject =
+  async (
+    projectId: string
+  ): Promise<Project> => {
+    const response =
+      await api.patch(
+        `/projects/${projectId}/start`
+      );
+
+    return extractProjectResponse(
+      response.data
+    );
+  };
+
+export const putProjectOnHold =
+  async (
+    projectId: string
+  ): Promise<Project> => {
+    const response =
+      await api.patch(
+        `/projects/${projectId}/hold`
+      );
+
+    return extractProjectResponse(
+      response.data
+    );
+  };
+
+export const resumeProject =
+  async (
+    projectId: string
+  ): Promise<Project> => {
+    const response =
+      await api.patch(
+        `/projects/${projectId}/resume`
+      );
+
+    return extractProjectResponse(
+      response.data
+    );
+  };
+
+export const completeProject =
+  async (
+    projectId: string
+  ): Promise<Project> => {
+    const response =
+      await api.patch(
+        `/projects/${projectId}/complete`
+      );
+
+    return extractProjectResponse(
+      response.data
+    );
+  };
+
+export const reopenProject =
+  async (
+    projectId: string
+  ): Promise<Project> => {
+    const response =
+      await api.patch(
+        `/projects/${projectId}/reopen`
       );
 
     return extractProjectResponse(
@@ -3218,11 +3492,17 @@ export const getPublicEvidenceImageUrl = (
 const projectService = {
   getProjects,
   getActiveProjects,
+  getProjectDashboardStats,
   getProjectById,
 
   createProject,
   updateProject,
 
+  startProject,
+  putProjectOnHold,
+  resumeProject,
+  completeProject,
+  reopenProject,
   archiveProject,
   permanentlyDeleteProject,
 
