@@ -68,21 +68,26 @@ const SEARCH_ROUTES: SearchRoute[] = [
 
   {
     keywords: [
+      "task",
+      "tasks",
+      "task register",
       "risk",
       "risks",
       "risk register",
     ],
 
-    path: "/risks",
+    path: "/tasks",
   },
 
   {
     keywords: [
+      "create task",
+      "new task",
       "create risk",
       "new risk",
     ],
 
-    path: "/risks/create",
+    path: "/tasks/create",
   },
 
   {
@@ -94,6 +99,18 @@ const SEARCH_ROUTES: SearchRoute[] = [
     ],
 
     path: "/documents",
+  },
+
+  {
+    keywords: [
+      "action plan",
+      "action plans",
+      "corrective action",
+      "corrective actions",
+      "create action plan",
+    ],
+
+    path: "/action-plans",
   },
 
   {
@@ -258,10 +275,31 @@ const getPageLabel = (
 
   if (
     pathname.startsWith(
+      "/tasks/create"
+    )
+  ) {
+    return "Create Task";
+  }
+
+  if (
+    pathname.startsWith(
+      "/tasks"
+    )
+  ) {
+    return "Task Register";
+  }
+
+  /*
+    Legacy Risk URLs are redirected to /tasks in App.tsx.
+    These labels remain only as a safe compatibility fallback.
+  */
+
+  if (
+    pathname.startsWith(
       "/risks/create"
     )
   ) {
-    return "Create Risk";
+    return "Create Task";
   }
 
   if (
@@ -269,7 +307,23 @@ const getPageLabel = (
       "/risks"
     )
   ) {
-    return "Risk Register";
+    return "Task Register";
+  }
+
+  if (
+    pathname.startsWith(
+      "/action-plans/create"
+    )
+  ) {
+    return "Create Action Plan";
+  }
+
+  if (
+    pathname.startsWith(
+      "/action-plans"
+    )
+  ) {
+    return "Action Plans";
   }
 
   if (

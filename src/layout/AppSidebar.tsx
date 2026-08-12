@@ -135,6 +135,26 @@ const navItems: NavItem[] = [
   {
     icon: <ListIcon />,
 
+    name: "Action Plans",
+
+    subItems: [
+      {
+        name: "All Action Plans",
+
+        path: "/action-plans",
+      },
+
+      {
+        name: "Create Action Plan",
+
+        path: "/action-plans/create",
+      },
+    ],
+  },
+
+  {
+    icon: <ListIcon />,
+
     name: "Testing & Controls",
 
     path: "/testing-controls",

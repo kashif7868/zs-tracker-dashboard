@@ -22,6 +22,10 @@ import TaskDetailsPage from "./pages/TaskRegister/TaskDetailsPage";
 
 import EvidencePage from "./pages/Evidence/EvidencePage";
 
+import ActionPlansPage from "./pages/ActionPlans/ActionPlansPage";
+import CreateActionPlanPage from "./pages/ActionPlans/CreateActionPlanPage";
+import ActionPlanDetailsPage from "./pages/ActionPlans/ActionPlanDetailsPage";
+
 import DocumentsPage from "./pages/Documents/DocumentsPage";
 
 import UsersPage from "./pages/Users/UsersPage";
@@ -146,6 +150,9 @@ export default function App() {
 
               {/* =================================================
                   TASK REGISTER
+
+                  Canonical replacement for legacy Risk Register.
+                  All dashboard navigation should use /tasks.
                   ================================================= */}
 
               <Route
@@ -164,6 +171,45 @@ export default function App() {
               />
 
               {/* =================================================
+                  LEGACY RISK URL REDIRECTS
+
+                  Old dashboard links remain usable, but all traffic
+                  is redirected to the canonical Task Register routes.
+
+                  No Risk page/component is rendered anymore.
+                  ================================================= */}
+
+              <Route
+                path="/risks"
+                element={
+                  <Navigate
+                    to="/tasks"
+                    replace
+                  />
+                }
+              />
+
+              <Route
+                path="/risks/create"
+                element={
+                  <Navigate
+                    to="/tasks/create"
+                    replace
+                  />
+                }
+              />
+
+              <Route
+                path="/risks/:riskId"
+                element={
+                  <Navigate
+                    to="/tasks"
+                    replace
+                  />
+                }
+              />
+
+              {/* =================================================
                   EVIDENCE
                   ================================================= */}
 
@@ -178,12 +224,17 @@ export default function App() {
 
               <Route
                 path="/action-plans"
-                element={
-                  <PlaceholderPage
-                    title="Action Plans"
-                    description="Corrective-action management will be connected in a later module."
-                  />
-                }
+                element={<ActionPlansPage />}
+              />
+
+              <Route
+                path="/action-plans/create"
+                element={<CreateActionPlanPage />}
+              />
+
+              <Route
+                path="/action-plans/:actionPlanId"
+                element={<ActionPlanDetailsPage />}
               />
 
               {/* =================================================
@@ -218,7 +269,7 @@ export default function App() {
                 element={
                   <PlaceholderPage
                     title="Notifications"
-                    description="Project and Task notifications will be connected in a later module."
+                    description="Project, Task, Action Plan and Evidence notifications will be connected in a later module."
                   />
                 }
               />

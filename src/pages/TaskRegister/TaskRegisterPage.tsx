@@ -37,7 +37,7 @@ type StatusFilter =
   | "all"
   | TaskStatus;
 
-const PAGE_LIMIT = 20;
+const PAGE_LIMIT = 10;
 
 const EMPTY_SUMMARY: TaskDashboardSummary = {
   totalTasks: 0,
@@ -225,6 +225,44 @@ const getTaskDisplayLabel = (
   `Task #${getTaskSerialLabel(
     task
   )}`;
+
+const getPaginationItems = (
+  currentPage: number,
+  totalPages: number
+): Array<number | "ellipsis"> => {
+  if (totalPages <= 7) {
+    return Array.from(
+      { length: totalPages },
+      (_, index) => index + 1
+    );
+  }
+
+  if (currentPage <= 4) {
+    return [1, 2, 3, 4, 5, "ellipsis", totalPages];
+  }
+
+  if (currentPage >= totalPages - 3) {
+    return [
+      1,
+      "ellipsis",
+      totalPages - 4,
+      totalPages - 3,
+      totalPages - 2,
+      totalPages - 1,
+      totalPages,
+    ];
+  }
+
+  return [
+    1,
+    "ellipsis",
+    currentPage - 1,
+    currentPage,
+    currentPage + 1,
+    "ellipsis",
+    totalPages,
+  ];
+};
 
 /* =========================================================
    SMALL COMPONENTS
@@ -685,6 +723,29 @@ export default function TaskRegisterPage() {
           selectedProjectId
         )}`
       : "/tasks/create";
+
+  const paginationItems =
+    useMemo(
+      () =>
+        getPaginationItems(
+          page,
+          totalPages
+        ),
+      [page, totalPages]
+    );
+
+  const firstVisibleRecord =
+    totalRecords === 0
+      ? 0
+      : (page - 1) *
+          PAGE_LIMIT +
+        1;
+
+  const lastVisibleRecord =
+    Math.min(
+      page * PAGE_LIMIT,
+      totalRecords
+    );
 
   /* =======================================================
      FILTERS
@@ -1225,7 +1286,7 @@ export default function TaskRegisterPage() {
                                 : "hover:bg-gray-50/80 dark:hover:bg-white/[0.02]"
                             }`}
                           >
-                            <td className="px-4 py-5 align-top">
+                            <td className="px-4 py-5 align-middle">
                               <span className="inline-flex min-w-12 items-center justify-center rounded-lg bg-gray-100 px-3 py-2 text-sm font-bold text-gray-800 dark:bg-gray-800 dark:text-gray-200">
                                 {getTaskSerialLabel(
                                   task
@@ -1233,14 +1294,14 @@ export default function TaskRegisterPage() {
                               </span>
                             </td>
 
-                            <td className="px-4 py-5 align-top">
+                            <td className="px-4 py-5 align-middle">
                               <span className="inline-flex rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-bold text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
                                 {projectReference ||
                                   "—"}
                               </span>
                             </td>
 
-                            <td className="min-w-0 px-4 py-5 align-top">
+                            <td className="min-w-0 px-4 py-5 align-middle">
                               <Link
                                 to={`/tasks/${task._id}`}
                                 className="line-clamp-3 text-sm font-semibold leading-6 text-gray-800 transition hover:text-emerald-600 dark:text-gray-200"
@@ -1256,7 +1317,7 @@ export default function TaskRegisterPage() {
                               </p>
                             </td>
 
-                            <td className="px-4 py-5 text-center align-top">
+                            <td className="px-4 py-5 text-center align-middle">
                               <EvidenceCount
                                 count={
                                   beforeCount
@@ -1265,7 +1326,7 @@ export default function TaskRegisterPage() {
                               />
                             </td>
 
-                            <td className="px-4 py-5 text-center align-top">
+                            <td className="px-4 py-5 text-center align-middle">
                               <EvidenceCount
                                 count={
                                   afterCount
@@ -1274,7 +1335,7 @@ export default function TaskRegisterPage() {
                               />
                             </td>
 
-                            <td className="px-4 py-5 text-center align-top">
+                            <td className="px-4 py-5 text-center align-middle">
                               <TaskStatusBadge
                                 status={
                                   task.status
@@ -1282,7 +1343,7 @@ export default function TaskRegisterPage() {
                               />
                             </td>
 
-                            <td className="px-4 py-5 align-top">
+                            <td className="px-4 py-5 align-middle">
                               <div className="flex items-center justify-center gap-2">
                                 <Link
                                   to={`/tasks/${task._id}`}
@@ -1475,65 +1536,107 @@ export default function TaskRegisterPage() {
 
           {!loading &&
           totalRecords > 0 ? (
-            <div className="flex flex-col gap-3 border-t border-gray-200 px-5 py-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Page{" "}
-                <span className="font-bold text-gray-900 dark:text-white">
-                  {page}
-                </span>
-                {" "}of{" "}
-                <span className="font-bold text-gray-900 dark:text-white">
-                  {totalPages}
-                </span>
-              </p>
+            <div className="border-t border-gray-200 bg-gray-50/60 px-5 py-4 dark:border-gray-800 dark:bg-gray-950/30 sm:px-6">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    Showing{" "}
+                    <span className="font-bold text-gray-900 dark:text-white">
+                      {firstVisibleRecord}
+                    </span>
+                    {"–"}
+                    <span className="font-bold text-gray-900 dark:text-white">
+                      {lastVisibleRecord}
+                    </span>
+                    {" "}of{" "}
+                    <span className="font-bold text-gray-900 dark:text-white">
+                      {totalRecords}
+                    </span>
+                    {" "}Tasks
+                  </p>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={
-                    page <= 1 ||
-                    loading
-                  }
-                  onClick={() =>
-                    setPage(
-                      (
-                        currentPage
-                      ) =>
+                  <span className="hidden h-4 w-px bg-gray-300 dark:bg-gray-700 sm:block" />
+
+                  <p className="text-xs font-semibold text-gray-400 dark:text-gray-500">
+                    10 records per page
+                  </p>
+                </div>
+
+                <nav
+                  className="flex flex-wrap items-center gap-1.5"
+                  aria-label="Task Register pagination"
+                >
+                  <button
+                    type="button"
+                    disabled={page <= 1 || loading}
+                    onClick={() =>
+                      setPage((currentPage) =>
                         Math.max(
-                          currentPage -
-                            1,
+                          currentPage - 1,
                           1
                         )
-                    )
-                  }
-                  className="inline-flex h-10 items-center justify-center rounded-xl border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
-                >
-                  Previous
-                </button>
+                      )
+                    }
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-gray-400 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
+                  >
+                    Previous
+                  </button>
 
-                <button
-                  type="button"
-                  disabled={
-                    page >=
-                      totalPages ||
-                    loading
-                  }
-                  onClick={() =>
-                    setPage(
-                      (
-                        currentPage
-                      ) =>
+                  {paginationItems.map(
+                    (item, index) =>
+                      item ===
+                      "ellipsis" ? (
+                        <span
+                          key={`ellipsis-${index}`}
+                          className="inline-flex h-10 min-w-8 items-center justify-center px-1 text-sm font-bold text-gray-400"
+                        >
+                          …
+                        </span>
+                      ) : (
+                        <button
+                          key={item}
+                          type="button"
+                          aria-current={
+                            item === page
+                              ? "page"
+                              : undefined
+                          }
+                          onClick={() =>
+                            setPage(
+                              item
+                            )
+                          }
+                          className={`inline-flex size-10 items-center justify-center rounded-xl border text-sm font-bold transition ${
+                            item === page
+                              ? "border-emerald-600 bg-emerald-600 text-white shadow-sm"
+                              : "border-gray-300 bg-white text-gray-700 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-emerald-800 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-400"
+                          }`}
+                        >
+                          {item}
+                        </button>
+                      )
+                  )}
+
+                  <button
+                    type="button"
+                    disabled={
+                      page >=
+                        totalPages ||
+                      loading
+                    }
+                    onClick={() =>
+                      setPage((currentPage) =>
                         Math.min(
-                          currentPage +
-                            1,
+                          currentPage + 1,
                           totalPages
                         )
-                    )
-                  }
-                  className="inline-flex h-10 items-center justify-center rounded-xl border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
-                >
-                  Next
-                </button>
+                      )
+                    }
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-gray-400 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
+                  >
+                    Next
+                  </button>
+                </nav>
               </div>
             </div>
           ) : null}
