@@ -24,7 +24,8 @@ import {
 
 type SettingsSection =
   | "roles"
-  | "permissions";
+  | "permissions"
+  | "reports";
 
 type RoleFormState = {
   name: string;
@@ -135,6 +136,24 @@ const formatPermissionName = (
       /\b\w/g,
       (letter) =>
         letter.toUpperCase()
+    );
+};
+
+const normalizeVisibleModuleText = (
+  value: string
+): string => {
+  return value
+    .replace(
+      /\bRisk Register\b/gi,
+      "Task Register"
+    )
+    .replace(
+      /\bRisks\b/gi,
+      "Tasks"
+    )
+    .replace(
+      /\bRisk\b/gi,
+      "Task"
     );
 };
 
@@ -844,8 +863,8 @@ export default function SettingsPage() {
           </h1>
 
           <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-500 dark:text-gray-400">
-            Manage dashboard roles and permissions for Projects, Risk Register,
-            Evidence and other Project Tracker modules.
+            Manage dashboard access for Projects, Task Register, Evidence,
+            Action Plans, Documents & Reports and other Project Tracker modules.
           </p>
         </div>
       </section>
@@ -877,7 +896,7 @@ export default function SettingsPage() {
 
         <aside className="h-fit rounded-2xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
           <p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
-            Access Settings
+            Project Settings
           </p>
 
           <nav className="space-y-1">
@@ -913,6 +932,23 @@ export default function SettingsPage() {
               }`}
             >
               Permission Reference
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                setActiveSection(
+                  "reports"
+                )
+              }
+              className={`w-full rounded-xl px-4 py-3 text-left text-sm font-semibold transition ${
+                activeSection ===
+                "reports"
+                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                  : "text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
+              }`}
+            >
+              Documents & Reports
             </button>
           </nav>
         </aside>
@@ -1236,8 +1272,11 @@ export default function SettingsPage() {
                 )}
               </section>
             </div>
-          ) : (
+          ) : activeSection ===
+            "permissions" ? (
             <PermissionReference />
+          ) : (
+            <ReportConfiguration />
           )}
         </main>
       </div>
@@ -1448,7 +1487,11 @@ export default function SettingsPage() {
                     >
                       <h4 className="font-semibold text-gray-900 dark:text-white">
                         {
-                          group.label
+                          normalizeVisibleModuleText(
+                            normalizeVisibleModuleText(
+                    group.label
+                  )
+                          )
                         }
                       </h4>
 
@@ -1481,13 +1524,19 @@ export default function SettingsPage() {
                               <span className="min-w-0">
                                 <span className="block text-sm font-semibold text-gray-800 dark:text-gray-200">
                                   {
-                                    permission.label
+                                    normalizeVisibleModuleText(
+                                      permission.label
+                                    )
                                   }
                                 </span>
 
                                 <span className="mt-1 block text-xs leading-5 text-gray-500">
                                   {
-                                    permission.description
+                                    normalizeVisibleModuleText(
+                                      normalizeVisibleModuleText(
+                            permission.description
+                          )
+                                    )
                                   }
                                 </span>
                               </span>
@@ -1614,7 +1663,9 @@ function PermissionReference() {
             >
               <h3 className="font-bold text-gray-900 dark:text-white">
                 {
-                  group.label
+                  normalizeVisibleModuleText(
+                    group.label
+                  )
                 }
               </h3>
 
@@ -1637,15 +1688,19 @@ function PermissionReference() {
                         </p>
 
                         <p className="mt-1 text-xs text-gray-400">
-                          {formatPermissionName(
-                            permission.key
+                          {normalizeVisibleModuleText(
+                            formatPermissionName(
+                              permission.key
+                            )
                           )}
                         </p>
                       </div>
 
                       <p className="min-w-0 break-words text-sm leading-6 text-gray-500 dark:text-gray-400">
                         {
-                          permission.description
+                          normalizeVisibleModuleText(
+                            permission.description
+                          )
                         }
                       </p>
                     </div>
@@ -1657,5 +1712,280 @@ function PermissionReference() {
         )}
       </div>
     </section>
+  );
+}
+
+/* =========================================================
+   DOCUMENTS & REPORTS
+   ========================================================= */
+
+function ReportConfiguration() {
+  const formatCards = [
+    {
+      name: "PDF",
+      extension: ".pdf",
+      description:
+        "Client-facing report with project details, Task Register, summary and embedded Before/After Evidence images.",
+    },
+    {
+      name: "Word",
+      extension: ".docx",
+      description:
+        "Editable client report with project information, Task details, Evidence images and professional page formatting.",
+    },
+    {
+      name: "Excel",
+      extension: ".xlsx",
+      description:
+        "Structured Task Register workbook with summary sheets, Evidence Register and embedded image previews.",
+    },
+  ];
+
+  const reportFeatures = [
+    "Project details and Project Reference",
+    "Task Register records",
+    "In Progress and Complete status",
+    "Before Evidence",
+    "After Evidence",
+    "Embedded Evidence images",
+    "Report summary and completion percentage",
+    "Ascending Task Sr. No. ordering",
+    "Custom report title support",
+    "Clean client-facing download filename",
+  ];
+
+  return (
+    <div className="space-y-6">
+      <section className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 sm:p-6">
+        <div className="absolute inset-x-0 top-0 h-1 bg-emerald-500" />
+
+        <p className="pt-1 text-xs font-bold uppercase tracking-[0.16em] text-emerald-600 dark:text-emerald-400">
+          Documents & Reports
+        </p>
+
+        <h2 className="mt-2 text-xl font-bold text-gray-900 dark:text-white">
+          Report Configuration
+        </h2>
+
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-500 dark:text-gray-400">
+          Current Project Tracker report capabilities. Report generation itself
+          is managed from the Documents module so this page does not maintain a
+          second, conflicting set of report-generation values.
+        </p>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-3">
+        {formatCards.map(
+          (
+            item
+          ) => (
+            <article
+              key={
+                item.name
+              }
+              className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                  {item.name}
+                </h3>
+
+                <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                  {item.extension}
+                </span>
+              </div>
+
+              <p className="mt-3 text-sm leading-6 text-gray-500 dark:text-gray-400">
+                {item.description}
+              </p>
+            </article>
+          )
+        )}
+      </section>
+
+      <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 sm:p-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h3 className="text-base font-bold text-gray-900 dark:text-white">
+              Current Report Content
+            </h3>
+
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Supported in the current PDF, Word and Excel report flow.
+            </p>
+          </div>
+
+          <a
+            href="/documents"
+            className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700"
+          >
+            Open Documents
+          </a>
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          {reportFeatures.map(
+            (
+              feature
+            ) => (
+              <div
+                key={
+                  feature
+                }
+                className="flex items-start gap-3 rounded-xl border border-gray-100 bg-gray-50/70 p-4 dark:border-gray-800 dark:bg-gray-950/30"
+              >
+                <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+                  ✓
+                </span>
+
+                <p className="text-sm font-medium leading-5 text-gray-700 dark:text-gray-300">
+                  {feature}
+                </p>
+              </div>
+            )
+          )}
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 sm:p-6">
+        <h3 className="text-base font-bold text-gray-900 dark:text-white">
+          Download Filename Rule
+        </h3>
+
+        <p className="mt-2 text-sm leading-6 text-gray-500 dark:text-gray-400">
+          Client downloads use the cleanest available report name in this
+          priority order.
+        </p>
+
+        <div className="mt-5 grid gap-3 md:grid-cols-3">
+          <SettingInfoCard
+            number="1"
+            title="Custom Report Title"
+            description="Used first when a title is entered while generating the report."
+          />
+
+          <SettingInfoCard
+            number="2"
+            title="Project Name"
+            description="Used automatically when no custom report title is supplied."
+          />
+
+          <SettingInfoCard
+            number="3"
+            title="Project Reference"
+            description="Used as the final project-specific fallback."
+          />
+        </div>
+
+        <div className="mt-5 rounded-xl border border-emerald-100 bg-emerald-50/70 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/20">
+          <p className="text-xs font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+            Example
+          </p>
+
+          <p className="mt-2 break-all text-sm font-semibold text-emerald-800 dark:text-emerald-200">
+            electrical-energy-loss-risk-assessment.pdf
+          </p>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 sm:p-6">
+        <h3 className="text-base font-bold text-gray-900 dark:text-white">
+          Module Status
+        </h3>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <ModuleStatus
+            name="Projects"
+            status="Active"
+          />
+
+          <ModuleStatus
+            name="Task Register"
+            status="Active"
+          />
+
+          <ModuleStatus
+            name="Evidence"
+            status="Active"
+          />
+
+          <ModuleStatus
+            name="Action Plans"
+            status="Active"
+          />
+
+          <ModuleStatus
+            name="Documents & Reports"
+            status="Active"
+          />
+
+          <ModuleStatus
+            name="Testing & Controls"
+            status="Planned"
+          />
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function SettingInfoCard({
+  number,
+  title,
+  description,
+}: {
+  number: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <article className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+      <div className="flex items-start gap-3">
+        <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-gray-900 text-xs font-bold text-white dark:bg-white dark:text-gray-900">
+          {number}
+        </span>
+
+        <div className="min-w-0">
+          <h4 className="text-sm font-bold text-gray-900 dark:text-white">
+            {title}
+          </h4>
+
+          <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">
+            {description}
+          </p>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function ModuleStatus({
+  name,
+  status,
+}: {
+  name: string;
+  status:
+    | "Active"
+    | "Planned";
+}) {
+  const active =
+    status === "Active";
+
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 bg-gray-50/60 p-4 dark:border-gray-800 dark:bg-gray-950/30">
+      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+        {name}
+      </span>
+
+      <span
+        className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
+          active
+            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+            : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+        }`}
+      >
+        {status}
+      </span>
+    </div>
   );
 }

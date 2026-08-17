@@ -56,42 +56,53 @@ export const ROLE_PERMISSION_GROUPS = [
       },
     ],
   },
+
+  /*
+    IMPORTANT:
+    Backend migration ke duran Task Register routes kuch jagah
+    legacy risks.* permission keys use kar rahe hain.
+
+    Is liye UI label Task Register hai, lekin keys risks.*
+    intentionally preserve ki gayi hain taa-ke existing backend
+    authorization break na ho.
+  */
   {
-    key: "risks",
-    label: "Risk Register",
+    key: "tasks",
+    label: "Task Register",
     permissions: [
       {
         key: "risks.view",
-        label: "View Risks",
+        label: "View Task Register",
         description:
-          "Risk list aur risk details dekh sakta hai.",
+          "Task Register list aur Task details dekh sakta hai.",
       },
       {
         key: "risks.create",
-        label: "Create Risks",
+        label: "Create Tasks",
         description:
-          "Naya Risk Register record create kar sakta hai.",
+          "Naya Task Register record create kar sakta hai.",
       },
       {
         key: "risks.update",
-        label: "Update Risks",
+        label: "Update Tasks",
         description:
-          "Risk information update kar sakta hai.",
+          "Existing Task information update kar sakta hai.",
       },
       {
         key: "risks.complete",
-        label: "Manage Risk Status",
+        label: "Manage Task Status",
         description:
-          "Risk ko Complete ya In Progress mark kar sakta hai.",
+          "Task ko Complete, In Progress, Pending ya On Hold status mein manage kar sakta hai.",
       },
       {
         key: "risks.delete",
-        label: "Delete Risks",
+        label: "Delete Tasks",
         description:
-          "Risk aur related Evidence delete kar sakta hai.",
+          "Task Register record delete kar sakta hai.",
       },
     ],
   },
+
   {
     key: "evidence",
     label: "Evidence",
@@ -113,6 +124,62 @@ export const ROLE_PERMISSION_GROUPS = [
         label: "Delete Evidence",
         description:
           "Single ya multiple Evidence images delete kar sakta hai.",
+      },
+    ],
+  },
+
+  {
+    key: "action_plans",
+    label: "Action Plans",
+    permissions: [
+      {
+        key: "action_plans.view",
+        label: "View Action Plans",
+        description:
+          "Project aur Task ke Action Plans dekh sakta hai.",
+      },
+      {
+        key: "action_plans.create",
+        label: "Create Action Plans",
+        description:
+          "Naya corrective Action Plan create kar sakta hai.",
+      },
+      {
+        key: "action_plans.update",
+        label: "Update Action Plans",
+        description:
+          "Action Plan details, priority, target date aur status update kar sakta hai.",
+      },
+      {
+        key: "action_plans.delete",
+        label: "Delete Action Plans",
+        description:
+          "Action Plan record delete kar sakta hai.",
+      },
+    ],
+  },
+
+  {
+    key: "documents",
+    label: "Documents & Reports",
+    permissions: [
+      {
+        key: "documents.view",
+        label: "View Documents & Reports",
+        description:
+          "Generated report history dekh aur completed reports download kar sakta hai.",
+      },
+      {
+        key: "documents.generate",
+        label: "Generate Reports",
+        description:
+          "Task Register aur Evidence data se PDF, DOCX aur XLSX reports generate kar sakta hai.",
+      },
+      {
+        key: "documents.delete",
+        label: "Delete Generated Reports",
+        description:
+          "Generated report file aur uska Document History record delete kar sakta hai.",
       },
     ],
   },
